@@ -1,0 +1,1708 @@
+# Vigilante 8 Arcade - ReXGlue Configuration
+# Migrated from XenonRecomp config
+
+project_name = "vig8"
+file_path = "../extracted/default.xex"
+out_directory_path = "../generated"
+
+# Code generation options (conservative - all disabled for initial pass)
+skip_lr = false
+skip_msr = false
+ctr_as_local = false
+xer_as_local = false
+cr_as_local = false
+reserved_as_local = false
+non_argument_as_local = false
+non_volatile_as_local = false
+generate_exception_handlers = false
+
+[analysis]
+max_jump_extension = 65536
+
+# Manual function overrides (from XenonRecomp config)
+[functions]
+0x8211FBB8 = { size = 176 }  # switch at 0x8211FBF4
+0x82136890 = { size = 256 }  # switch at 0x821368E0
+0x821368A0 = { size = 240 }  # switch at 0x821368E0 (cont)
+0x821A4610 = { size = 896 }  # switch at 0x821A464C (cont)
+0x8223B538 = { size = 176 }  # switch at 0x8223B560 (cont)
+0x8223BC48 = { size = 896 }  # switch at 0x8223BCB0
+0x8223BC90 = { size = 512 }  # switch at 0x8223BCB0 (cont)
+0x822DB178 = { size = 664 }  # switch at 0x822DB310
+0x822DB298 = { size = 376 }  # switch at 0x822DB310 (cont)
+# Fix unresolved call: 0x82173E3C branches to 0x82173508
+0x82173508 = { end = 0x82173E40 }
+# Vtable functions missed by static analysis (called only through vtable dispatch)
+0x821A17D0 = { end = 0x821A17E8 }
+0x821664F0 = { end = 0x82166564 }
+0x8216BEA8 = { end = 0x8216BEC0 }
+0x8216F518 = { end = 0x8216F53C }
+0x8216F560 = { end = 0x8216F57C }
+# C++ this-adjustor thunks (2-instruction vtable dispatch wrappers)
+0x8216B558 = { end = 0x8216B560 }
+0x82173E28 = { end = 0x82173E30 }
+0x82173E30 = { end = 0x82173E38 }
+0x82173E38 = { end = 0x82173E40 }
+0x82173E68 = { end = 0x82173E70 }
+0x82174EC8 = { end = 0x82174ED0 }
+0x82176128 = { end = 0x82176130 }
+0x82176138 = { end = 0x82176140 }
+0x82176140 = { end = 0x82176148 }
+0x82176148 = { end = 0x82176150 }
+0x82176170 = { end = 0x82176178 }
+0x82176178 = { end = 0x82176180 }
+0x82176190 = { end = 0x82176198 }
+0x821C6470 = { end = 0x821C6478 }
+# Another vtable function called from game object system (0x82122358)
+0x820CC2C8 = { end = 0x820CC2D0 }
+# Fix cross-function gotos: sub_8219F570 branches into sub_8219F6C0 body
+# These are one large function split incorrectly by analysis
+0x8219F570 = { end = 0x8219F950 }
+
+# Switch tables (81 entries)
+
+[[switch_tables]]
+address = 0x821720C0
+register = 4
+labels = [
+    0x8217210C,
+    0x82172120,
+    0x8217212C,
+    0x82172138,
+    0x82172144,
+    0x82172150,
+    0x8217215C,
+    0x82172168,
+    0x82172174,
+    0x82172180,
+    0x8217218C,
+    0x82172198,
+    0x821721A4,
+]
+
+[[switch_tables]]
+address = 0x82177D78
+register = 9
+labels = [
+    0x82177DA8,
+    0x82177DA8,
+    0x82177DB4,
+    0x82177DA8,
+    0x82177DB4,
+    0x82177DA8,
+]
+
+[[switch_tables]]
+address = 0x82188274
+register = 11
+labels = [
+    0x82188390,
+    0x82188370,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188390,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x821883B0,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x82188458,
+    0x821883B0,
+]
+
+[[switch_tables]]
+address = 0x821ED8B0
+register = 11
+labels = [
+    0x821EDB14,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821ED9E4,
+    0x821ED9A4,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDB1C,
+    0x821EDAE4,
+    0x821EDAB4,
+    0x821EDA84,
+    0x821EDA54,
+    0x821EDA24,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+    0x821EDC8C,
+]
+
+[[switch_tables]]
+address = 0x821EE09C
+register = 11
+labels = [
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE240,
+    0x821EE214,
+    0x821EE1E8,
+    0x821EE1BC,
+    0x821EE190,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+    0x821EE4A8,
+]
+
+[[switch_tables]]
+address = 0x821F0868
+register = 28
+labels = [
+    0x821F08A0,
+    0x821F08A8,
+    0x821F08C0,
+    0x821F0914,
+    0x821F0930,
+    0x821F094C,
+    0x821F0A58,
+    0x821F0B64,
+]
+
+[[switch_tables]]
+address = 0x821F1158
+register = 4
+labels = [
+    0x821F1188,
+    0x821F11C8,
+    0x821F120C,
+    0x821F1238,
+    0x821F1260,
+    0x821F12A0,
+]
+
+[[switch_tables]]
+address = 0x82206F70
+register = 18
+labels = [
+    0x82206FDC,
+    0x8220701C,
+    0x82207424,
+    0x82207034,
+    0x82207034,
+    0x82207074,
+    0x82207034,
+    0x8220713C,
+    0x822071C0,
+    0x82207180,
+    0x82207424,
+    0x82207424,
+    0x822071C0,
+    0x822071C0,
+    0x82207424,
+    0x82207424,
+    0x822071C0,
+    0x82207424,
+    0x822071C0,
+    0x82207200,
+    0x82207218,
+]
+
+[[switch_tables]]
+address = 0x822081EC
+register = 11
+labels = [
+    0x82208258,
+    0x82208258,
+    0x8220857C,
+    0x82208258,
+    0x82208258,
+    0x82208258,
+    0x82208258,
+    0x82208258,
+    0x82208258,
+    0x82208258,
+    0x822082C8,
+    0x8220857C,
+    0x82208258,
+    0x82208258,
+    0x8220857C,
+    0x8220857C,
+    0x82208258,
+    0x8220857C,
+    0x82208258,
+    0x82208258,
+    0x82208258,
+]
+
+[[switch_tables]]
+address = 0x822153E4
+register = 4
+labels = [
+    0x8221542C,
+    0x82215C64,
+    0x82215DD8,
+    0x82215EE0,
+    0x82215744,
+    0x82215FEC,
+    0x822162D4,
+    0x8221608C,
+    0x82215638,
+    0x822163DC,
+    0x822158E4,
+    0x82215A98,
+]
+
+[[switch_tables]]
+address = 0x822186D0
+register = 7
+labels = [
+    0x822186F8,
+    0x8221881C,
+    0x822189E4,
+    0x82218B74,
+]
+
+[[switch_tables]]
+address = 0x82218D40
+register = 8
+labels = [
+    0x82218D68,
+    0x82218DA4,
+    0x82218DF0,
+    0x82218E38,
+]
+
+[[switch_tables]]
+address = 0x82220B64
+register = 11
+labels = [
+    0x82220BB8,
+    0x82220BC4,
+    0x82220BD0,
+    0x82220BDC,
+    0x82220BE8,
+    0x82220C28,
+    0x82220C34,
+    0x82220C40,
+    0x82220C48,
+    0x82220C88,
+    0x82220CC8,
+    0x82220D08,
+    0x82220D10,
+    0x82220D50,
+    0x82220D58,
+]
+
+[[switch_tables]]
+address = 0x82220DAC
+register = 11
+labels = [
+    0x82220E00,
+    0x82220E30,
+    0x82220E58,
+    0x82220E80,
+    0x82220EA8,
+    0x82220EF8,
+    0x82220F20,
+    0x82220F48,
+    0x82220F50,
+    0x82220F9C,
+    0x82220FE0,
+    0x82221024,
+    0x8222102C,
+    0x82221078,
+    0x82221080,
+]
+
+[[switch_tables]]
+address = 0x8223A300
+register = 11
+labels = [
+    0x8223A39C,
+    0x8223A390,
+    0x8223A330,
+    0x8223A328,
+]
+
+[[switch_tables]]
+address = 0x8223A368
+register = 11
+labels = [
+    0x8223A390,
+    0x8223A328,
+    0x8223A330,
+    0x8223A39C,
+]
+
+[[switch_tables]]
+address = 0x8223B54C
+register = 10
+labels = [
+    0x8223B574,
+    0x8223B59C,
+    0x8223B5AC,
+    0x8223B59C,
+]
+
+[[switch_tables]]
+address = 0x8223BC9C
+register = 11
+labels = [
+    0x8223BCD0,
+    0x8223BCE4,
+    0x8223BCF4,
+    0x8223BD2C,
+    0x8223BD5C,
+    0x8223BDC4,
+    0x8223BDD8,
+]
+
+[[switch_tables]]
+address = 0x8223BE04
+register = 11
+labels = [
+    0x8223BE38,
+    0x8223BE8C,
+    0x8223BE44,
+    0x8223BE8C,
+    0x8223BE50,
+    0x8223BE8C,
+    0x8223BE5C,
+]
+
+[[switch_tables]]
+address = 0x8224773C
+register = 11
+labels = [
+    0x82247764,
+    0x82247770,
+    0x82247764,
+    0x8224777C,
+]
+
+[[switch_tables]]
+address = 0x8224C5B4
+register = 11
+labels = [
+    0x8224C5F0,
+    0x8224C5E4,
+    0x8224C7C4,
+    0x8224C7BC,
+    0x8224C680,
+    0x8224C718,
+]
+
+[[switch_tables]]
+address = 0x8224F8BC
+register = 11
+labels = [
+    0x8224F8F4,
+    0x8224F8F0,
+    0x8224FB00,
+    0x8224FAFC,
+    0x8224F984,
+    0x8224FA40,
+    0x8224FF1C,
+]
+
+[[switch_tables]]
+address = 0x8224FFB0
+register = 14
+labels = [
+    0x8224FFE0,
+    0x82250024,
+    0x82250094,
+    0x82250198,
+    0x822501E8,
+    0x82250228,
+]
+
+[[switch_tables]]
+address = 0x82250AA0
+register = 14
+labels = [
+    0x82250AD0,
+    0x82250ADC,
+    0x82250AE8,
+    0x82250AF4,
+    0x82250B00,
+    0x82250B0C,
+]
+
+[[switch_tables]]
+address = 0x82251018
+register = 11
+labels = [
+    0x82251064,
+    0x8225105C,
+    0x82251054,
+    0x8225104C,
+    0x82251044,
+]
+
+[[switch_tables]]
+address = 0x82252850
+register = 11
+labels = [
+    0x82252884,
+    0x82252880,
+    0x822529B4,
+    0x822529B0,
+    0x822528EC,
+    0x82252950,
+]
+
+[[switch_tables]]
+address = 0x8228D05C
+register = 8
+labels = [
+    0x8228D088,
+    0x8228D0B0,
+    0x8228D0F4,
+    0x8228D160,
+    0x8228D134,
+]
+
+[[switch_tables]]
+address = 0x8228D290
+register = 11
+labels = [
+    0x8228D2BC,
+    0x8228D32C,
+    0x8228D38C,
+    0x8228D428,
+    0x8228D3EC,
+]
+
+[[switch_tables]]
+address = 0x8228D8B8
+register = 11
+labels = [
+    0x8228D8E8,
+    0x8228D948,
+    0x8228D984,
+    0x8228D9AC,
+    0x8228D9BC,
+    0x8228D9F4,
+]
+
+[[switch_tables]]
+address = 0x822A6184
+register = 10
+labels = [
+    0x822A61AC,
+    0x822A61C0,
+    0x822A61D4,
+    0x822A61F0,
+]
+
+[[switch_tables]]
+address = 0x822D4118
+register = 10
+labels = [
+    0x822D4160,
+    0x822D4160,
+    0x822D4160,
+    0x822D4160,
+    0x822D4164,
+    0x822D4160,
+    0x822D4164,
+    0x822D4160,
+    0x822D4160,
+    0x822D4164,
+    0x822D4164,
+    0x822D4160,
+]
+
+[[switch_tables]]
+address = 0x822DB1DC
+register = 9
+labels = [
+    0x822DB204,
+    0x822DB228,
+    0x822DB24C,
+    0x822DB270,
+]
+
+[[switch_tables]]
+address = 0x822DB2FC
+register = 9
+labels = [
+    0x822DB324,
+    0x822DB350,
+    0x822DB37C,
+    0x822DB3A8,
+]
+
+[[switch_tables]]
+address = 0x822DCAC4
+register = 11
+labels = [
+    0x822DCBB0,
+    0x822DCDF4,
+    0x822DCDF4,
+    0x822DCDF4,
+    0x822DCDF4,
+    0x822DCB38,
+    0x822DCB78,
+    0x822DCB8C,
+    0x822DCCBC,
+    0x822DCCD4,
+    0x822DCCEC,
+    0x822DCDF4,
+    0x822DCD98,
+    0x822DCDA8,
+    0x822DCDB8,
+    0x822DCDC8,
+    0x822DCDD8,
+    0x822DCD08,
+    0x822DCD2C,
+    0x822DCD50,
+    0x822DCD74,
+    0x822DCDE8,
+    0x822DCCAC,
+]
+
+[[switch_tables]]
+address = 0x822E5464
+register = 23
+labels = [
+    0x822E5494,
+    0x822E54D8,
+    0x822E5548,
+    0x822E564C,
+    0x822E569C,
+    0x822E56DC,
+]
+
+[[switch_tables]]
+address = 0x822E5EDC
+register = 23
+labels = [
+    0x822E5F0C,
+    0x822E5F14,
+    0x822E5F1C,
+    0x822E5F24,
+    0x822E5F2C,
+    0x822E5F34,
+]
+
+[[switch_tables]]
+address = 0x822E6004
+register = 11
+labels = [
+    0x822E6038,
+    0x822E6034,
+    0x822E6244,
+    0x822E6240,
+    0x822E60C8,
+    0x822E6184,
+]
+
+[[switch_tables]]
+address = 0x822E78CC
+register = 11
+labels = [
+    0x822E7C0C,
+    0x822E7C90,
+    0x822E7CB8,
+    0x822E7E68,
+    0x822E78F8,
+]
+
+[[switch_tables]]
+address = 0x822ED49C
+register = 11
+labels = [
+    0x822ED724,
+    0x822ED724,
+    0x822ED644,
+    0x822ED514,
+    0x822ED4C8,
+]
+
+[[switch_tables]]
+address = 0x822EDF54
+register = 11
+labels = [
+    0x822EDFA8,
+    0x822EDFB4,
+    0x822EDFC0,
+    0x822EDFCC,
+    0x822EDFD8,
+    0x822EE018,
+    0x822EE024,
+    0x822EE030,
+    0x822EE038,
+    0x822EE078,
+    0x822EE0B8,
+    0x822EE0F8,
+    0x822EE100,
+    0x822EE140,
+    0x822EE148,
+]
+
+[[switch_tables]]
+address = 0x822EE19C
+register = 11
+labels = [
+    0x822EE1F0,
+    0x822EE220,
+    0x822EE248,
+    0x822EE270,
+    0x822EE298,
+    0x822EE2E8,
+    0x822EE310,
+    0x822EE338,
+    0x822EE340,
+    0x822EE38C,
+    0x822EE3D0,
+    0x822EE414,
+    0x822EE41C,
+    0x822EE468,
+    0x822EE470,
+]
+
+[[switch_tables]]
+address = 0x822F2E8C
+register = 10
+labels = [
+    0x822F2EB4,
+    0x822F2EE4,
+    0x822F2F14,
+    0x822F2F44,
+]
+
+[[switch_tables]]
+address = 0x82304FE8
+register = 11
+labels = [
+    0x82305010,
+    0x8230504C,
+    0x82305230,
+    0x823053F8,
+]
+
+[[switch_tables]]
+address = 0x823057C4
+register = 11
+labels = [
+    0x82305D78,
+    0x823057EC,
+    0x823059C8,
+    0x82305BA4,
+]
+
+[[switch_tables]]
+address = 0x8233B5D0
+register = 30
+labels = [
+    0x8233B788,
+    0x8233B5F8,
+    0x8233B610,
+    0x8233B868,
+]
+
+[[switch_tables]]
+address = 0x82348794
+register = 8
+labels = [
+    0x823487D4,
+    0x82348828,
+    0x8234887C,
+    0x82348884,
+    0x823488D4,
+    0x823488D4,
+    0x823488D4,
+    0x823488D4,
+    0x823487D4,
+    0x82348828,
+]
+
+[[switch_tables]]
+address = 0x82348D24
+register = 8
+labels = [
+    0x82348D64,
+    0x82348DB8,
+    0x82348E0C,
+    0x82348E14,
+    0x82348E64,
+    0x82348E64,
+    0x82348E64,
+    0x82348E64,
+    0x82348D64,
+    0x82348DB8,
+]
+
+[[switch_tables]]
+address = 0x823492A0
+register = 8
+labels = [
+    0x823492E0,
+    0x823492F0,
+    0x823492FC,
+    0x82349304,
+    0x82349364,
+    0x82349364,
+    0x82349364,
+    0x82349364,
+    0x823492E0,
+    0x823492F0,
+]
+
+[[switch_tables]]
+address = 0x8237DF90
+register = 11
+labels = [
+    0x8237DFB8,
+    0x8237DFC4,
+    0x8237DFF0,
+    0x8237E074,
+]
+
+[[switch_tables]]
+address = 0x8237E280
+register = 11
+labels = [
+    0x8237E2A8,
+    0x8237E2B4,
+    0x8237E2E0,
+    0x8237E364,
+]
+
+[[switch_tables]]
+address = 0x8237EB04
+register = 11
+labels = [
+    0x82380A80,
+    0x8237F55C,
+    0x8238004C,
+    0x8237EB2C,
+]
+
+[[switch_tables]]
+address = 0x8238181C
+register = 11
+labels = [
+    0x82381C64,
+    0x82381C64,
+    0x82381AFC,
+    0x82381844,
+]
+
+[[switch_tables]]
+address = 0x82383920
+register = 11
+labels = [
+    0x82383948,
+    0x82383954,
+    0x82383980,
+    0x82383A04,
+]
+
+[[switch_tables]]
+address = 0x82383BB8
+register = 11
+labels = [
+    0x82383BE0,
+    0x82383BEC,
+    0x82383C18,
+    0x82383C9C,
+]
+
+[[switch_tables]]
+address = 0x820E17A0
+register = 11
+labels = [
+    0x820E17C8,
+    0x820E1900,
+    0x820E1944,
+    0x820E1958,
+    0x820E19CC,
+    0x820E1994,
+    0x820E1B14,
+    0x820E188C,
+    0x820E19E4,
+    0x820E19F4,
+    0x820E1854,
+    0x820E18B8,
+]
+
+[[switch_tables]]
+address = 0x8211B12C
+register = 11
+labels = [
+    0x8211B154,
+    0x8211B15C,
+    0x8211B170,
+    0x8211B184,
+    0x8211B2C8,
+    0x8211B2C8,
+    0x8211B190,
+    0x8211B198,
+    0x8211B1A0,
+    0x8211B288,
+    0x8211B21C,
+    0x8211B228,
+    0x8211B104,
+    0x8211B238,
+    0x8211B2C8,
+    0x8211B2C8,
+    0x8211B2C8,
+    0x8211B264,
+    0x8211B280,
+    0x8211B2C8,
+]
+
+[[switch_tables]]
+address = 0x8211B5AC
+register = 11
+labels = [
+    0x8211B5D4,
+    0x8211B6C8,
+    0x8211B5DC,
+    0x8211B6C8,
+    0x8211B69C,
+    0x8211B69C,
+    0x8211B600,
+    0x8211B584,
+    0x8211B584,
+    0x8211B67C,
+    0x8211B61C,
+    0x8211B630,
+    0x8211B584,
+    0x8211B650,
+    0x8211B69C,
+    0x8211B69C,
+    0x8211B69C,
+    0x8211B6C8,
+    0x8211B584,
+    0x8211B69C,
+]
+
+[[switch_tables]]
+address = 0x8211BEA0
+register = 11
+labels = [
+    0x8211BEC8,
+    0x8211BF64,
+    0x8211BF88,
+    0x8211BFAC,
+    0x8211BFEC,
+    0x8211C028,
+    0x8211BFD0,
+    0x8211C064,
+    0x8211C06C,
+    0x8211C0C4,
+    0x8211C110,
+    0x8211C124,
+    0x8211BE6C,
+    0x8211C144,
+    0x8211C170,
+    0x8211C1A0,
+    0x8211C1DC,
+    0x8211C224,
+    0x8211C240,
+    0x8211C0E8,
+    0x8211C248,
+]
+
+[[switch_tables]]
+address = 0x821219E0
+register = 11
+labels = [
+    0x82121A08,
+    0x82121A40,
+    0x82121A40,
+    0x82121A48,
+    0x82121B18,
+    0x82121B7C,
+    0x82121BB8,
+    0x82121C44,
+    0x82121BEC,
+]
+
+[[switch_tables]]
+address = 0x82122108
+register = 11
+labels = [
+    0x82122130,
+    0x82122130,
+    0x82122150,
+    0x8212218C,
+    0x821221DC,
+    0x82122220,
+    0x821222D8,
+    0x82122360,
+    0x82122320,
+]
+
+[[switch_tables]]
+address = 0x82122AB0
+register = 11
+labels = [
+    0x82122AD8,
+    0x82122AD8,
+    0x82122B3C,
+    0x82122B78,
+    0x82122BC8,
+    0x82122C0C,
+    0x82122CC4,
+    0x82122D4C,
+    0x82122D0C,
+]
+
+[[switch_tables]]
+address = 0x82135E80
+register = 10
+labels = [
+    0x82135F3C,
+    0x82135F70,
+    0x82135EEC,
+    0x82135EA8,
+    0x82136034,
+    0x82135FA0,
+    0x82135FD0,
+    0x82135FEC,
+    0x82136008,
+]
+
+[[switch_tables]]
+address = 0x82141B54
+register = 31
+labels = [
+    0x82141B80,
+    0x82141B7C,
+    0x82141B80,
+    0x82141D24,
+    0x82141C58,
+    0x82141C58,
+    0x82141E10,
+    0x82141E34,
+    0x82141E94,
+    0x82141E94,
+    0x82141B80,
+    0x82141E94,
+    0x82141D24,
+    0x82141E94,
+    0x82141E78,
+    0x82141E84,
+]
+
+[[switch_tables]]
+address = 0x82189BAC
+register = 4
+labels = [
+    0x82189BD4,
+    0x82189BF4,
+    0x82189C08,
+    0x82189C1C,
+    0x82189C30,
+    0x82189C44,
+    0x82189C58,
+    0x82189C6C,
+    0x82189C84,
+    0x82189C9C,
+    0x82189CCC,
+    0x82189CE0,
+    0x82189E00,
+    0x82189D14,
+    0x82189D44,
+    0x82189D5C,
+    0x82189D68,
+    0x82189D80,
+    0x82189DA4,
+    0x82189DC8,
+    0x82189DC8,
+    0x82189DEC,
+    0x82189DC8,
+    0x82189DC8,
+]
+
+[[switch_tables]]
+address = 0x821A12E8
+register = 10
+labels = [
+    0x821A1310,
+    0x821A1324,
+    0x821A1338,
+    0x821A134C,
+    0x821A1378,
+    0x821A138C,
+    0x821A13AC,
+    0x821A13C0,
+    0x821A13D4,
+    0x821A13E4,
+    0x821A13F8,
+]
+
+[[switch_tables]]
+address = 0x821A4628
+register = 11
+labels = [
+    0x821A4650,
+    0x821A4664,
+    0x821A4678,
+    0x821A468C,
+    0x821A46A0,
+    0x821A46B4,
+    0x821A46C8,
+    0x821A46DC,
+    0x821A46F0,
+    0x821A4704,
+    0x821A4718,
+    0x821A472C,
+    0x821A4740,
+    0x821A4754,
+    0x821A4768,
+    0x821A477C,
+    0x821A4790,
+    0x821A47A4,
+    0x821A47B8,
+    0x821A47CC,
+    0x821A47E0,
+    0x821A47F4,
+    0x821A4808,
+    0x821A481C,
+    0x821A4830,
+    0x821A4844,
+    0x821A485C,
+    0x821A4870,
+]
+
+[[switch_tables]]
+address = 0x821A5820
+register = 11
+labels = [
+    0x821A5848,
+    0x821A5868,
+    0x821A5884,
+    0x821A5890,
+    0x821A589C,
+    0x821A58A8,
+    0x821A58B4,
+    0x821A58C0,
+    0x821A58CC,
+    0x821A58D8,
+    0x821A58E4,
+    0x821A58F0,
+    0x821A58FC,
+    0x821A5908,
+    0x821A5914,
+    0x821A5920,
+    0x821A592C,
+    0x821A5938,
+    0x821A5944,
+    0x821A5950,
+    0x821A595C,
+    0x821A59F8,
+    0x821A5A04,
+    0x821A5A10,
+    0x821A5A1C,
+    0x821A5A28,
+    0x821A5A74,
+    0x821A5A80,
+]
+
+[[switch_tables]]
+address = 0x821A6F88
+register = 11
+labels = [
+    0x821A6FB0,
+    0x821A6FCC,
+    0x821A72AC,
+    0x821A6FE0,
+    0x821A705C,
+    0x821A7070,
+    0x821A72AC,
+    0x821A72AC,
+    0x821A7084,
+    0x821A7098,
+    0x821A70AC,
+    0x821A70C0,
+    0x821A70D4,
+    0x821A70E8,
+    0x821A72AC,
+    0x821A70FC,
+    0x821A7110,
+    0x821A7124,
+    0x821A7174,
+    0x821A71C4,
+    0x821A72AC,
+    0x821A71D8,
+    0x821A71EC,
+    0x821A7200,
+    0x821A7214,
+    0x821A7228,
+    0x821A7240,
+    0x821A7254,
+]
+
+[[switch_tables]]
+address = 0x821AA674
+register = 11
+labels = [
+    0x821AA69C,
+    0x821AA6B0,
+    0x821AA908,
+    0x821AA6C4,
+    0x821AA728,
+    0x821AA73C,
+    0x821AA908,
+    0x821AA908,
+    0x821AA750,
+    0x821AA908,
+    0x821AA908,
+    0x821AA908,
+    0x821AA908,
+    0x821AA75C,
+    0x821AA908,
+    0x821AA908,
+    0x821AA908,
+    0x821AA768,
+    0x821AA7C0,
+    0x821AA818,
+    0x821AA908,
+    0x821AA824,
+    0x821AA830,
+    0x821AA83C,
+    0x821AA848,
+    0x821AA854,
+    0x821AA8B4,
+    0x821AA8C0,
+]
+
+[[switch_tables]]
+address = 0x821AC734
+register = 11
+labels = [
+    0x821AC75C,
+    0x821AC784,
+    0x821AC7A8,
+    0x821AC7BC,
+    0x821AC7CC,
+    0x821AC7E0,
+    0x821AC7F4,
+    0x821AC808,
+    0x821AC81C,
+    0x821AC830,
+    0x821AC844,
+    0x821AC858,
+    0x821AC86C,
+    0x821AC880,
+    0x821AC894,
+    0x821AC8A8,
+    0x821AC8BC,
+    0x821AC8D0,
+    0x821AC8E4,
+    0x821AC8F8,
+    0x821AC90C,
+    0x821AC920,
+    0x821AC934,
+    0x821AC948,
+    0x821AC95C,
+    0x821AC9DC,
+    0x821AC970,
+    0x821AC984,
+]
+
+[[switch_tables]]
+address = 0x821ACAB8
+register = 11
+labels = [
+    0x821ACAE0,
+    0x821ACAFC,
+    0x821ACB18,
+    0x821ACB34,
+    0x821ACB4C,
+    0x821ACB68,
+    0x821ACB84,
+    0x821ACBA0,
+    0x821ACBBC,
+    0x821ACBD8,
+    0x821ACBF4,
+    0x821ACC10,
+    0x821ACC2C,
+    0x821ACC48,
+    0x821ACC64,
+    0x821ACC80,
+    0x821ACC9C,
+    0x821ACCB8,
+    0x821ACCD4,
+    0x821ACCF0,
+    0x821ACD0C,
+    0x821ACD28,
+    0x821ACD44,
+    0x821ACD60,
+    0x821ACD7C,
+    0x821ACE40,
+    0x821ACD98,
+    0x821ACDB4,
+]
+
+[[switch_tables]]
+address = 0x8231F0E0
+register = 11
+labels = [
+    0x8231F108,
+    0x8231F17C,
+    0x8231F1FC,
+    0x8231F27C,
+    0x8231F2EC,
+    0x8231F360,
+    0x8231F380,
+    0x8231F404,
+    0x8231F3C8,
+    0x8231F45C,
+    0x8231F450,
+    0x8231F41C,
+]
+
+[[switch_tables]]
+address = 0x820DE3FC
+register = 29
+labels = [
+    0x820DE424,
+    0x820DE44C,
+    0x820DE460,
+    0x820DE474,
+    0x820DE488,
+    0x820DE49C,
+    0x820DE4B0,
+    0x820DE4C4,
+    0x820DE4D8,
+    0x820DE4EC,
+    0x820DE504,
+]
+
+[[switch_tables]]
+address = 0x8211FBD0
+register = 11
+labels = [
+    0x8211FC0C,
+    0x8211FC20,
+    0x8211FC20,
+    0x8211FC28,
+    0x8211FC2C,
+    0x8211FC20,
+    0x8211FC20,
+    0x8211FC04,
+    0x8211FBF8,
+]
+
+[[switch_tables]]
+address = 0x821368BC
+register = 10
+labels = [
+    0x821368E4,
+    0x82136934,
+    0x8213690C,
+    0x82136948,
+    0x82136960,
+    0x82136974,
+    0x8213697C,
+    0x82136984,
+    0x82136984,
+]
+
+[[switch_tables]]
+address = 0x8215DC54
+register = 4
+labels = [
+    0x8215DCD4,
+    0x8215DC94,
+    0x8215DC9C,
+    0x8215DCA4,
+    0x8215DCD0,
+    0x8215DC7C,
+    0x8215DC84,
+    0x8215DC8C,
+]
+
+[[switch_tables]]
+address = 0x8219D79C
+register = 3
+labels = [
+    0x8219D7E8,
+]
+
+[[switch_tables]]
+address = 0x821A6E98
+register = 11
+labels = [
+    0x821A6EC0,
+    0x821A6ED0,
+    0x821A6ED8,
+    0x821A6EE8,
+    0x821A6F00,
+    0x821A6F08,
+    0x821A6F10,
+    0x821A6F18,
+    0x821A6F20,
+    0x821A6F28,
+]
+
+[[switch_tables]]
+address = 0x820B900C
+register = 4
+labels = [
+    0x820B90EC,
+    0x820B957C,
+    0x820B9464,
+    0x820B91D8,
+    0x820B9978,
+    0x820B9978,
+    0x820B95A8,
+    0x820B960C,
+    0x820B964C,
+    0x820B9718,
+    0x820B9814,
+    0x820B9878,
+    0x820B9034,
+    0x820B9570,
+]
+
+[[switch_tables]]
+address = 0x820B9AC0
+register = 25
+labels = [
+    0x820BBAE0,
+    0x820BBDEC,
+    0x820BBE30,
+    0x820BD1C8,
+    0x820BE77C,
+    0x820BD488,
+    0x820B9EE0,
+    0x820BB118,
+    0x820BA2A8,
+    0x820BB258,
+    0x820BE6B8,
+    0x820BD62C,
+    0x820BDF18,
+    0x820BDEB8,
+    0x820B9AE8,
+]
+
+[[switch_tables]]
+address = 0x82149E3C
+register = 31
+labels = [
+    0x82149E64,
+    0x82149E84,
+    0x82149EB0,
+    0x82149EC8,
+    0x82149F2C,
+    0x82149F5C,
+    0x82149F98,
+    0x8214A038,
+    0x8214A0BC,
+    0x8214A11C,
+    0x8214A17C,
+    0x8214A1B0,
+    0x8214A1F4,
+    0x8214A220,
+    0x8214A248,
+    0x8214A270,
+    0x8214A2A4,
+    0x8214A028,
+    0x8214A038,
+]
+
+[[switch_tables]]
+address = 0x82190D28
+register = 11
+labels = [
+    0x82190D50,
+    0x82190DA8,
+    0x82190E30,
+    0x82191494,
+    0x82191494,
+    0x82191494,
+    0x82190EB8,
+    0x82190F48,
+    0x82190FD8,
+    0x82191068,
+    0x82191120,
+    0x82191138,
+    0x82191494,
+    0x82191494,
+    0x82191178,
+    0x821911A8,
+    0x821911B4,
+    0x82191264,
+    0x821912D8,
+    0x82191334,
+    0x82191334,
+    0x821913CC,
+    0x82191334,
+    0x82191334,
+    0x8219142C,
+    0x8219142C,
+]
+
+[[switch_tables]]
+address = 0x823190F8
+register = 11
+labels = [
+    0x823192EC,
+    0x82319120,
+    0x82319140,
+    0x82319190,
+    0x823191DC,
+    0x823191E4,
+    0x8231921C,
+    0x8231933C,
+]
+
+[[switch_tables]]
+address = 0x82319348
+register = 11
+labels = [
+    0x8231954C,
+    0x82319840,
+    0x82319370,
+    0x82319840,
+    0x8231954C,
+    0x82319840,
+    0x8231954C,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319458,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x8231968C,
+    0x82319840,
+    0x823193DC,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319558,
+    0x82319840,
+    0x82319380,
+    0x8231967C,
+    0x82319558,
+    0x82319558,
+    0x82319558,
+    0x82319840,
+    0x8231967C,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319840,
+    0x82319510,
+    0x823196C4,
+    0x82319688,
+    0x82319840,
+    0x82319840,
+    0x82319468,
+    0x82319840,
+    0x82319680,
+    0x82319840,
+    0x82319840,
+    0x82319694,
+]
+
+[[switch_tables]]
+address = 0x8231BC20
+register = 11
+labels = [
+    0x8231BC48,
+    0x8231C0E8,
+    0x8231C424,
+    0x8231C424,
+    0x8231C424,
+    0x8231C7FC,
+    0x8231BF88,
+    0x8231C7FC,
+    0x8231C7FC,
+    0x8231C7FC,
+    0x8231C7FC,
+    0x8231C3D4,
+    0x8231C0E8,
+    0x8231C0E4,
+    0x8231C7FC,
+    0x8231C7FC,
+    0x8231BC58,
+    0x8231C7FC,
+    0x8231C0E8,
+    0x8231C7FC,
+    0x8231C7FC,
+    0x8231BF8C,
+    0x8231C7FC,
+    0x8231C7FC,
+    0x8231BC68,
+]
+
+[[switch_tables]]
+address = 0x8212DD34
+register = 19
+labels = [
+    0x8212DD38,
+    0x8212DEB0,
+    0x8212DF4C,
+    0x8212DFD4,
+    0x8212E038,
+    0x8212E05C,
+    0x8212E114,
+    0x8212E240,
+    0x8212E2F4,
+    0x8212E3AC,
+    0x8212E3EC,
+    0x8212E418,
+    0x8212E424,
+    0x8212E4F0,
+    0x8212E558,
+    0x8212E5DC,
+    0x8212E6A8,
+    0x8212E97C,
+    0x8212EA58,
+    0x8212EC20,
+    0x8212EC88,
+    0x8212EDE8,
+    0x8212EE70,
+    0x8212EF18,
+    0x8212EF38,
+    0x8212F014,
+    0x8212F0B8,
+    0x8212F0C0,
+    0x8212F20C,
+    0x8212DD38,
+]

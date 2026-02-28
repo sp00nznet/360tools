@@ -1,0 +1,88 @@
+# Vigilante 8 Arcade - XenonRecomp Configuration
+# Generated: 2026-02-17
+
+[main]
+file_path = "../extracted/default.xex"
+out_directory_path = "../ppc"
+switch_table_file_path = "vig8_switch_tables.toml"
+
+# ABI Register Save/Restore Addresses
+# Found by scanning the XEX binary for standard PPC ABI function patterns
+savegprlr_14_address = 0x82310F00
+restgprlr_14_address = 0x82310F50
+savefpr_14_address = 0x82311720
+restfpr_14_address = 0x8231176C
+savevmx_14_address = 0x823117C0
+restvmx_14_address = 0x82311A58
+savevmx_64_address = 0x82311854
+restvmx_64_address = 0x82311AEC
+
+# setjmp/longjmp not found in this binary
+# longjmp_address = 0x00000000
+# setjmp_address = 0x00000000
+
+# Manual function definitions to fix switch case boundary errors.
+# Each entry covers a .pdata gap where Function::Analyze incorrectly split
+# a function containing a switch table (bctr) into multiple small functions.
+#
+# KEY INSIGHT: Manual entries define NEW functions but do NOT suppress
+# auto-detected functions at nearby addresses. We must define functions at
+# the EXACT start addresses of the broken auto-detected functions so they
+# get replaced/overridden with the correct (larger) size.
+functions = [
+    # Error 1: switch at 0x8211FBF4, targets 0x8211FBF8-0x8211FC2C
+    { address = 0x8211FBB8, size = 0xB0 },
+
+    # Error 2: switch at 0x821368E0 in auto-detected sub_821368A0
+    # Manual sub_82136890 works, but sub_821368A0 still has errors.
+    # sub_821368A0 needs to extend to 0x82136990 (next func boundary).
+    { address = 0x82136890, size = 0x100 },
+    { address = 0x821368A0, size = 0xF0 },
+
+    # Error 3: switch at 0x821A464C in auto-detected sub_821A4610
+    # Manual sub_821A460C works, but sub_821A4610 still has errors.
+    # sub_821A4610 needs to extend to 0x821A4990 (next func boundary).
+    { address = 0x821A460C, size = 0x48C },
+    { address = 0x821A4610, size = 0x380 },
+
+    # Error 4: switch at 0x8223B560 in auto-detected sub_8223B538
+    # Manual sub_8223B2F4 works, but sub_8223B538 still has errors.
+    # sub_8223B538 needs to extend to 0x8223B5E8 (next func boundary).
+    { address = 0x8223B2F4, size = 0x2F4 },
+    { address = 0x8223B538, size = 0xB0 },
+
+    # Error 5: switch at 0x8223BCB0 in auto-detected sub_8223BC90
+    # Manual sub_8223BC48 works, but sub_8223BC90 still has errors.
+    # sub_8223BC90 needs to extend to 0x8223BE90 (next func boundary).
+    { address = 0x8223BC48, size = 0x380 },
+    { address = 0x8223BC90, size = 0x200 },
+
+    # Error 6: switch at 0x822DB310 in auto-detected sub_822DB298
+    # Manual sub_822DB178 works, but sub_822DB298 still has errors.
+    # sub_822DB298 needs to extend to 0x822DB410 (next func boundary).
+    { address = 0x822DB178, size = 0x298 },
+    { address = 0x822DB298, size = 0x178 },
+]
+
+[optimizations]
+# All optimizations DISABLED for initial recompilation pass
+# Enable these ONLY after basic recompilation works correctly
+skip_lr = false
+skip_msr = false
+ctr_as_local = false
+xer_as_local = false
+reserved_as_local = false
+cr_as_local = false
+non_argument_as_local = false
+non_volatile_as_local = false
+
+# Invalid instruction skips (add as needed during iteration)
+# invalid_instructions = [
+#     { data = 0x00000000, size = 4 },
+# ]
+
+# Mid-ASM hooks (add as needed for runtime integration)
+# [[midasm_hook]]
+# name = "ExampleHook"
+# address = 0x00000000
+# registers = ["r3"]
