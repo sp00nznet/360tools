@@ -5,10 +5,10 @@
 No emulator. No interpreter. No JIT. Just your Xbox 360 game, recompiled to C++ and running natively on x86-64 at full speed.
 
 ```
-   XBLA Game (PowerPC)
-         |
-    [ extract_stfs.py ]     <-- crack open the STFS/LIVE package
-         |
+   XBLA Game (PowerPC) ----or---- Xbox 360 ISO
+         |                              |
+    [ extract_stfs.py ]         [ extract_iso.py ]
+         |                              |
     [ extract_pe.py ]        <-- decrypt & decompress the XEX2
          |
     [ find_abi_addrs.py ]    <-- locate PPC ABI helpers
@@ -28,8 +28,9 @@ No emulator. No interpreter. No JIT. Just your Xbox 360 game, recompiled to C++ 
 
 | Script | What It Does |
 |--------|-------------|
-| **`extract_stfs.py`** | Rips files out of STFS/LIVE/PIRS Xbox 360 packages. Point it at a downloaded XBLA title and it pulls out the XEX and all game assets. |
-| **`extract_pe.py`** | Decrypts (AES-128) and decompresses (LZX or basic block) the PE image buried inside an XEX2 file. This is what XenonRecomp actually needs. |
+| **`extract_stfs.py`** | Rips files out of STFS/LIVE/PIRS/CON Xbox 360 packages. Point it at a downloaded XBLA title and it pulls out the XEX and all game assets. Handles edge cases like `start_block=0` entries. |
+| **`extract_iso.py`** | Extracts game files from Xbox 360 XDVDFS disc images. Finds the partition automatically (XGD1/XGD2), parses the B-tree directory, and extracts all files. Detects encrypted ISOs and points you to extract-xiso. |
+| **`extract_pe.py`** | Decrypts (AES-128) and decompresses the PE image buried inside an XEX2 file. Handles both basic block and LZX (Normal) compression, plus raw COFF headers without MZ/PE signatures. This is what XenonRecomp actually needs. |
 | **`lzx_decompress.py`** | Pure Python LZX decompression. Used by `extract_pe.py` for XEX files with LZX-compressed PE images. |
 | **`find_abi_addrs.py`** | Scans the PE binary for all 10 standard PowerPC ABI helper functions (`__savegprlr_14`, `__restfpr_14`, VMX save/restore, `setjmp`/`longjmp`, etc.) and outputs them in TOML format ready for XenonRecomp. |
 | **`extract_switch_tables.py`** | Finds PPC switch/jump tables by pattern-matching `add r12,r12,r0; mtctr r12; bctr` sequences, reads the table data, and generates `[[switch]]` TOML entries. Handles u8/u16 entries, scaling, bounds checking. |
@@ -52,19 +53,22 @@ A complete, working project template based on the patterns proven across multipl
 
 ```
 templates/
-  ppc_config.h              # PPC_INCLUDE_DETAIL gate for macro overrides
+  ppc_config.h              # __builtin_trap() override, PPC_CALL_INDIRECT_FUNC
+                             #   with import thunk resolution, PPC_INCLUDE_DETAIL gate
   project/
     CMakeLists.txt           # ReXGlue SDK build with WHOLEARCHIVE linking
     CMakePresets.json         # Clang + Ninja preset (win-amd64)
     src/
       main.cpp               # Windowed app: VEH crash handler, null page handler,
+                              #   guest page demand paging, C++ exception decoding,
                               #   F11 fullscreen, ImGui overlay, stderr logging
       menu.cpp / menu.h      # Win32 native menu bar + ImGui config dialogs
                               #   (Graphics, Game, Debug, Controls)
       settings.cpp / settings.h  # TOML-based settings persistence via toml++
       stubs.cpp              # Game-specific kernel stub overrides
                               #   (license bypass, multi-user sign-in, etc.)
-      keyboard_driver.cpp/h  # WASD/arrow keyboard input -> gamepad mapping
+      keyboard_driver.cpp/h  # Keyboard + XInput merged input driver
+                              #   (both keyboard and real controller work simultaneously)
       test_boot.cpp          # Console-mode test harness for isolating crashes
 ```
 
@@ -92,8 +96,10 @@ Reference TOML configurations for XenonRecomp and ReXGlue codegen, with comments
 ### The Pipeline
 
 ```bash
-# 1. Get your game files out of the XBLA package
+# 1. Get your game files out of the XBLA package (or ISO)
 python tools/extract_stfs.py path/to/XBLA_PACKAGE output_dir/
+# -- or for disc-based games --
+python tools/extract_iso.py path/to/game.iso output_dir/
 
 # 2. Decrypt and decompress the XEX into a raw PE image
 python tools/extract_pe.py output_dir/default.xex pe_image.bin
@@ -150,10 +156,13 @@ Windows `Sleep(16)` actually sleeps ~31ms due to 15.6ms timer granularity. The f
 XenonRecomp generates `__rdtsc()` for PPC `mftb` instructions, but your PC's TSC runs at ~3-4 GHz vs the Xbox 360's 49.875 MHz. The `ppc_config.h` template overrides `__rdtsc()` to route through the ReXGlue SDK's scaled guest timebase.
 
 ### PPC_CALL_INDIRECT_FUNC Safe Dispatch
-C++ vtable calls on Xbox 360 need NULL checks, code range validation, and graceful fallback instead of hard crashes. The `generated/*_init.h` template includes the battle-hardened macro.
+C++ vtable calls on Xbox 360 need NULL checks, code range validation, import thunk resolution, and graceful fallback instead of hard crashes. The `ppc_config.h` template includes the battle-hardened macro that handles all three cases: NULL targets, import thunks (decodes the PPC `lis/lwz/mtctr/bctr` pattern and resolves through the IAT), and normal code-range targets.
 
-### VEH Null Page Handler
-A Vectored Exception Handler that intercepts null pointer dereferences in guest memory space, decodes the x86-64 instruction, zeros the destination register, and continues execution. Prevents crashes from lazy null checks that the Xbox 360 hardware handled silently.
+### __builtin_trap() Override
+XenonRecomp emits `__builtin_trap()` as safety nets for out-of-range switch/jump table indices, but some paths are legitimately reached at runtime. The template overrides this to log a rate-limited warning instead of crashing.
+
+### VEH Null Page Handler + Guest Page Demand Paging
+Three Vectored Exception Handlers work together: a crash logger (with C++ exception decoding via MSVC's `0xE06D7363` magic), a guest page commit handler (demand-pages 4KB within the guest address range), and a null page handler that intercepts null pointer dereferences, decodes the x86-64 instruction (MOV, MOVZX, MOVSX, MOVSXD, MOV8), zeros the destination register, and continues execution.
 
 ### ROV vs RTV Render Path
 If you're getting white screens with certain render target formats (especially `k_2_10_10_10_FLOAT` + 4xMSAA), switch to the ROV (Rasterizer Ordered Views) path. ROV uses pixel shader interlock for EDRAM emulation and handles these edge cases correctly.
@@ -164,7 +173,9 @@ If you're getting white screens with certain render target formats (especially `
 |------|------|--------|
 | **The Simpsons Arcade** (XBLA, 2012) | [simpsonsarcade](https://github.com/sp00nznet/simpsonsarcade) | Playable -- full speed, audio, input, graphics |
 | **Vigilante 8 Arcade** (XBLA) | [vig8](https://github.com/sp00nznet/vig8) | Playable -- 90 FPS, split-screen multiplayer, 79 shaders |
-| **Crazy Taxi** (XBLA, 2010) | [ctxbla](https://github.com/sp00nznet/ctxbla) | In progress -- keyboard input, frame timing done |
+| **Guitar Hero II** (Xbox 360, 2007) | [gh2](https://github.com/sp00nznet/gh2) | Playable -- gameplay, audio, scoring, keyboard input working. Guitar controller support in progress |
+| **Crazy Taxi** (XBLA, 2010) | [ctxbla](https://github.com/sp00nznet/ctxbla) | Playable -- D3D12 rendering, keyboard + XInput, arcade mode. In-game audio (XMA) in progress |
+| **Comix Zone** (XBLA, 2009) | [comixzone](https://github.com/sp00nznet/comixzone) | Analysis -- binary extracted, 11,824 functions generated, runtime scaffold pending |
 | **Virtual On: Oratorio Tangram** (XBLA) | [voot](https://github.com/sp00nznet/voot) | Foundation -- project structure, codegen config ready |
 
 ## The Stack

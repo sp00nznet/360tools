@@ -141,6 +141,23 @@ static LONG CALLBACK CrashVEH(EXCEPTION_POINTERS* ep) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
+// VEH handler: commit guest memory pages on demand within the guest address
+// range. Some games touch memory before explicitly allocating it -- this
+// handler commits 4KB pages on first access instead of crashing.
+static LONG CALLBACK GuestPageCommitHandler(EXCEPTION_POINTERS* ep) {
+    auto* rec = ep->ExceptionRecord;
+    if (rec->ExceptionCode != STATUS_ACCESS_VIOLATION) return EXCEPTION_CONTINUE_SEARCH;
+    uint64_t addr = rec->ExceptionInformation[1];
+    uint64_t guest_base = ep->ContextRecord->Rsi;
+    // Only handle addresses in the guest memory range (base .. base + 256MB)
+    if (guest_base < 0x100000000ULL || guest_base > 0x200000000ULL) return EXCEPTION_CONTINUE_SEARCH;
+    if (addr < guest_base || addr >= guest_base + 0x10000000ULL) return EXCEPTION_CONTINUE_SEARCH;
+    void* page = (void*)(addr & ~0xFFFULL);
+    void* result = VirtualAlloc(page, 0x1000, MEM_COMMIT, PAGE_READWRITE);
+    if (result) return EXCEPTION_CONTINUE_EXECUTION;
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 // VEH handler: catch null page reads in guest memory and return 0
 // Decodes common x86-64 load instructions and zeros the destination register.
 static LONG CALLBACK NullPageHandler(EXCEPTION_POINTERS* ep) {
@@ -242,8 +259,9 @@ static LONG CALLBACK NullPageHandler(EXCEPTION_POINTERS* ep) {
 
 static struct NullPageGuard_ {
     NullPageGuard_() {
-        AddVectoredExceptionHandler(0, CrashVEH);      // log all exceptions (low priority)
-        AddVectoredExceptionHandler(1, NullPageHandler); // handle null page (high priority)
+        AddVectoredExceptionHandler(0, CrashVEH);              // log all exceptions (low priority)
+        AddVectoredExceptionHandler(1, GuestPageCommitHandler); // commit guest pages on demand
+        AddVectoredExceptionHandler(1, NullPageHandler);        // handle null page (high priority)
     }
 } g_null_page_guard_;
 #endif

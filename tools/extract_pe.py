@@ -17,8 +17,11 @@ XEX2 basic block compression:
 Usage: python extract_pe.py <input.xex> <output.bin>
 """
 
+import os
 import struct
 import sys
+
+from lzx_decompress import LZXDecoder
 
 try:
     from Crypto.Cipher import AES
@@ -181,6 +184,66 @@ def decrypt_xex2(xex_path, output_path):
         print(f"  Decompressed to {dst_pos} bytes")
         final_image = bytes(pe_image[:image_size])
 
+    elif comp_type == 2:  # Normal (LZX) compression
+        print("\nDecompressing LZX blocks...")
+
+        # LZX header: window_bits(4) at ffi+8, first block hash(20) at ffi+12,
+        # then block descriptors: { data_size(4), hash(20) }[] until size==0
+        window_info = read_be32(data, ffi_offset + 8)
+        window_bits = window_info & 0x1F
+        window_bits = max(15, min(21, window_bits))
+        window_size = 1 << window_bits
+
+        print(f"  Window bits: {window_bits} (window size: {window_size})")
+
+        # Read block descriptors (skip 4-byte window_info + 20-byte first hash)
+        blocks = []
+        block_pos = ffi_offset + 8 + 4 + 20
+        while block_pos + 24 <= ffi_offset + ffi_size:
+            block_data_size = read_be32(data, block_pos)
+            if block_data_size == 0:
+                break
+            blocks.append(block_data_size)
+            block_pos += 24  # 4 bytes size + 20 bytes SHA1 hash
+
+        print(f"  Found {len(blocks)} LZX compression blocks")
+        for i, bs in enumerate(blocks[:5]):
+            print(f"    Block[{i}]: compressed size = {bs} (0x{bs:X})")
+        if len(blocks) > 5:
+            print(f"    ... and {len(blocks) - 5} more blocks")
+
+        pe_image = bytearray()
+        src_pos = 0
+        decoder = LZXDecoder(window_bits)
+
+        for i, comp_size in enumerate(blocks):
+            if src_pos + comp_size > len(decrypted_data):
+                avail = len(decrypted_data) - src_pos
+                print(f"  WARNING: Block {i} overflows (need {comp_size}, have {avail})")
+                if avail <= 0:
+                    break
+                comp_size = avail
+
+            block_data = bytes(decrypted_data[src_pos:src_pos + comp_size])
+            remaining = image_size - len(pe_image)
+            decomp_size = min(window_size, remaining)
+            if decomp_size <= 0:
+                break
+
+            try:
+                decompressed = decoder.decompress(block_data, decomp_size)
+                pe_image.extend(decompressed)
+            except Exception as e:
+                print(f"  ERROR decompressing block {i}: {e}")
+                pe_image.extend(b'\x00' * decomp_size)
+
+            src_pos += comp_size
+            if i % 100 == 0 and i > 0:
+                print(f"    Decompressed {i}/{len(blocks)} blocks ({len(pe_image)} bytes)...")
+
+        final_image = bytes(pe_image[:image_size])
+        print(f"  Decompressed to {len(final_image)} bytes")
+
     elif comp_type == 0:  # No compression
         final_image = decrypted_data[:image_size]
     else:
@@ -212,15 +275,27 @@ def decrypt_xex2(xex_path, output_path):
                     print(f"  Found PE signature at offset 0x{try_off:X}")
                     break
             if pe_off is None:
-                print("  WARNING: No PE signature found anywhere")
-                # Write anyway for debugging
-                with open(output_path, 'wb') as f:
-                    f.write(final_image)
-                print(f"\nWrote {len(final_image)} bytes to {output_path} (unvalidated)")
-                return True
+                # Check for raw COFF header (no PE\0\0 signature)
+                # Xbox 360 PE images use machine type 0x01F2 (PPC)
+                if len(final_image) >= 2:
+                    machine = struct.unpack('<H', final_image[0:2])[0]
+                    if machine == 0x01F2:
+                        print(f"  COFF header at offset 0 (machine=0x{machine:04X} = PPC/Xbox360)")
+                        pe_off = -4  # so pe_off+4 = 0 (COFF starts at 0)
+                if pe_off is None:
+                    print("  WARNING: No PE signature found anywhere")
+                    with open(output_path, 'wb') as f:
+                        f.write(final_image)
+                    print(f"\nWrote {len(final_image)} bytes to {output_path} (unvalidated)")
+                    return True
 
     # Parse PE sections
-    coff_off = pe_off + 4 if has_mz or final_image[pe_off:pe_off+4] == b'PE\x00\x00' else pe_off
+    if pe_off < 0:
+        coff_off = 0  # Raw COFF header at offset 0
+    elif has_mz or (pe_off >= 0 and final_image[pe_off:pe_off+4] == b'PE\x00\x00'):
+        coff_off = pe_off + 4
+    else:
+        coff_off = pe_off
     if coff_off + 20 <= len(final_image):
         machine = struct.unpack('<H', final_image[coff_off:coff_off+2])[0]
         num_sections = struct.unpack('<H', final_image[coff_off+2:coff_off+4])[0]

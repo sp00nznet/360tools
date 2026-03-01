@@ -39,7 +39,7 @@ def extract_live_pirs(input_path, output_dir):
         fsize = os.path.getsize(input_path)
         magic = infile.read(4)
         print(f"Magic: {magic}")
-        assert magic in (b'LIVE', b'PIRS'), f"Not a LIVE/PIRS file: {magic}"
+        assert magic in (b'LIVE', b'PIRS', b'CON '), f"Not a LIVE/PIRS/CON file: {magic}"
 
         if fsize < 0xD000:
             print(f"File too small: {fsize} bytes (need at least 0xD000)")
@@ -63,14 +63,17 @@ def extract_live_pirs(input_path, output_dir):
         print(f"Data start: 0x{start:X}")
         print(f"Hash table offset: 0x{offset:X}")
 
-        # Read first cluster number from first entry's start_block field
+        # Read file table data.
+        # Some packages have start_block=0 for the first entry, which would
+        # cause us to read zero blocks. Instead, read a generous number of
+        # blocks and scan until we hit empty entries.
         infile.seek(start + 0x2F)
         firstclust = struct.unpack("<H", infile.read(2))[0]
-        print(f"First cluster (file table size in blocks): {firstclust}")
+        max_ft_blocks = max(firstclust, 16)  # at least 16 blocks
+        print(f"First cluster hint: {firstclust}, reading up to {max_ft_blocks} blocks")
 
-        # Read the entire file table
         infile.seek(start)
-        ft_data = infile.read(0x1000 * firstclust)
+        ft_data = infile.read(0x1000 * max_ft_blocks)
 
         # Dictionary for directory structure
         paths = {0xFFFF: ""}
@@ -131,10 +134,6 @@ def extract_live_pirs(input_path, output_dir):
                 os.makedirs(full_dir, exist_ok=True)
                 print(f"    -> Created directory: {paths[i]}")
             else:
-                if startclust < 1:
-                    print(f"    WARNING: Starting cluster must be >= 1, skipping")
-                    continue
-
                 # Determine output path
                 parent = paths.get(pathind, "")
                 out_path = os.path.join(output_dir, parent, outname)
@@ -150,10 +149,13 @@ def extract_live_pirs(input_path, output_dir):
                     realstart = adstart + get_cluster(cur_clust, offset)
                     infile.seek(realstart)
                     chunk = infile.read(min(0x1000, remaining))
+                    if not chunk:
+                        print(f"    WARNING: Read failed at offset 0x{realstart:X}")
+                        break
                     file_data.extend(chunk)
                     cur_clust += 1
                     adstart += 0x1000
-                    remaining -= 0x1000
+                    remaining -= len(chunk)
 
                 with open(out_path, 'wb') as outfile:
                     outfile.write(bytes(file_data[:filelen]))

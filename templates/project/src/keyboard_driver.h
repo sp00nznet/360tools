@@ -1,10 +1,11 @@
-// simpsons - Keyboard-to-gamepad input driver
-// Maps keyboard keys to Xbox 360 controller inputs
+// Keyboard + XInput merged input driver
+// Maps keyboard keys to Xbox 360 controller inputs and merges with
+// a real Xbox controller via dynamically-loaded XInput.
 //
-// Default key mapping (beat 'em up layout):
+// Default key mapping (action game layout):
 //   WASD / Arrow keys  = D-pad
-//   Z / J              = A (attack)
-//   X / K              = B (jump)
+//   Z / J              = A (confirm / attack)
+//   X / K              = B (cancel / jump)
 //   C / L              = X (special)
 //   V                  = Y
 //   Enter              = Start

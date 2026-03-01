@@ -1,4 +1,6 @@
-// simpsons - Keyboard-to-gamepad input driver implementation
+// Keyboard + XInput merged input driver
+// Keyboard input is OR'd with real controller input so both work simultaneously.
+// XInput is loaded dynamically to avoid DLL conflicts with SDL-based input in the SDK.
 
 #include "keyboard_driver.h"
 
@@ -8,72 +10,106 @@
 
 #include <cstring>
 
+#ifdef _WIN32
+#include <windows.h>
+
+// XInput structures (defined locally to avoid header conflicts)
+struct XINPUT_GAMEPAD_S {
+    WORD wButtons;
+    BYTE bLeftTrigger;
+    BYTE bRightTrigger;
+    SHORT sThumbLX;
+    SHORT sThumbLY;
+    SHORT sThumbRX;
+    SHORT sThumbRY;
+};
+struct XINPUT_STATE_S {
+    DWORD dwPacketNumber;
+    XINPUT_GAMEPAD_S Gamepad;
+};
+typedef DWORD (WINAPI *XInputGetState_t)(DWORD, XINPUT_STATE_S*);
+
+static XInputGetState_t GetXInputGetState() {
+    static XInputGetState_t fn = nullptr;
+    static bool tried = false;
+    if (!tried) {
+        tried = true;
+        HMODULE h = LoadLibraryA("xinput1_4.dll");
+        if (!h) h = LoadLibraryA("xinput1_3.dll");
+        if (!h) h = LoadLibraryA("xinput9_1_0.dll");
+        if (h) fn = (XInputGetState_t)GetProcAddress(h, "XInputGetState");
+    }
+    return fn;
+}
+
+// Poll keyboard state via GetAsyncKeyState and return as gamepad buttons/triggers
+static void PollKeyboard(uint16_t& buttons, uint8_t& lt, uint8_t& rt) {
+    buttons = 0;
+    lt = 0;
+    rt = 0;
+
+    // D-pad: WASD + Arrow keys
+    if (GetAsyncKeyState('W') & 0x8000 || GetAsyncKeyState(VK_UP) & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_DPAD_UP;
+    if (GetAsyncKeyState('S') & 0x8000 || GetAsyncKeyState(VK_DOWN) & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_DPAD_DOWN;
+    if (GetAsyncKeyState('A') & 0x8000 || GetAsyncKeyState(VK_LEFT) & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_DPAD_LEFT;
+    if (GetAsyncKeyState('D') & 0x8000 || GetAsyncKeyState(VK_RIGHT) & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_DPAD_RIGHT;
+
+    // Face buttons
+    if (GetAsyncKeyState('Z') & 0x8000 || GetAsyncKeyState('J') & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_A;
+    if (GetAsyncKeyState('X') & 0x8000 || GetAsyncKeyState('K') & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_B;
+    if (GetAsyncKeyState('C') & 0x8000 || GetAsyncKeyState('L') & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_X;
+    if (GetAsyncKeyState('V') & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_Y;
+
+    // System
+    if (GetAsyncKeyState(VK_RETURN) & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_START;
+    if (GetAsyncKeyState(VK_BACK) & 0x8000 || GetAsyncKeyState(VK_ESCAPE) & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_BACK;
+
+    // Shoulders
+    if (GetAsyncKeyState('Q') & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_LEFT_SHOULDER;
+    if (GetAsyncKeyState('E') & 0x8000)
+        buttons |= X_INPUT_GAMEPAD_RIGHT_SHOULDER;
+
+    // Triggers via number keys
+    if (GetAsyncKeyState('1') & 0x8000)
+        lt = 255;
+    if (GetAsyncKeyState('3') & 0x8000)
+        rt = 255;
+}
+#endif
+
 using namespace rex::ui;
 using namespace rex::input;
 
 KeyboardInputDriver::KeyboardInputDriver(rex::ui::Window* window)
     : InputDriver(window, 0) {
-    if (window) {
-        window->AddInputListener(this, 0);
-    }
 }
 
 KeyboardInputDriver::~KeyboardInputDriver() {
-    if (window()) {
-        window()->RemoveInputListener(this);
-    }
 }
 
 X_STATUS KeyboardInputDriver::Setup() {
     return X_STATUS_SUCCESS;
 }
 
-uint16_t KeyboardInputDriver::MapKeyToButton(VirtualKey key) {
-    switch (key) {
-        case VirtualKey::kW:     case VirtualKey::kUp:    return X_INPUT_GAMEPAD_DPAD_UP;
-        case VirtualKey::kS:     case VirtualKey::kDown:  return X_INPUT_GAMEPAD_DPAD_DOWN;
-        case VirtualKey::kA:     case VirtualKey::kLeft:  return X_INPUT_GAMEPAD_DPAD_LEFT;
-        case VirtualKey::kD:     case VirtualKey::kRight: return X_INPUT_GAMEPAD_DPAD_RIGHT;
-        case VirtualKey::kZ:     case VirtualKey::kJ:     return X_INPUT_GAMEPAD_A;
-        case VirtualKey::kX:     case VirtualKey::kK:     return X_INPUT_GAMEPAD_B;
-        case VirtualKey::kC:     case VirtualKey::kL:     return X_INPUT_GAMEPAD_X;
-        case VirtualKey::kV:                              return X_INPUT_GAMEPAD_Y;
-        case VirtualKey::kReturn:                         return X_INPUT_GAMEPAD_START;
-        case VirtualKey::kBack:  case VirtualKey::kEscape: return X_INPUT_GAMEPAD_BACK;
-        case VirtualKey::kQ:                              return X_INPUT_GAMEPAD_LEFT_SHOULDER;
-        case VirtualKey::kE:                              return X_INPUT_GAMEPAD_RIGHT_SHOULDER;
-        default:                                          return 0;
-    }
-}
-
-void KeyboardInputDriver::OnKeyDown(KeyEvent& e) {
-    uint16_t button = MapKeyToButton(e.virtual_key());
-    if (button) {
-        buttons_.fetch_or(button, std::memory_order_relaxed);
-        return;
-    }
-    if (e.virtual_key() == VirtualKey::k1)
-        left_trigger_.store(255, std::memory_order_relaxed);
-    else if (e.virtual_key() == VirtualKey::k3)
-        right_trigger_.store(255, std::memory_order_relaxed);
-}
-
-void KeyboardInputDriver::OnKeyUp(KeyEvent& e) {
-    uint16_t button = MapKeyToButton(e.virtual_key());
-    if (button) {
-        buttons_.fetch_and(~button, std::memory_order_relaxed);
-        return;
-    }
-    if (e.virtual_key() == VirtualKey::k1)
-        left_trigger_.store(0, std::memory_order_relaxed);
-    else if (e.virtual_key() == VirtualKey::k3)
-        right_trigger_.store(0, std::memory_order_relaxed);
-}
+// These are unused with the polling approach but kept for the interface
+uint16_t KeyboardInputDriver::MapKeyToButton(VirtualKey key) { return 0; }
+void KeyboardInputDriver::OnKeyDown(KeyEvent& e) {}
+void KeyboardInputDriver::OnKeyUp(KeyEvent& e) {}
 
 X_RESULT KeyboardInputDriver::GetCapabilities(uint32_t user_index,
                                                uint32_t flags,
                                                X_INPUT_CAPABILITIES* out_caps) {
-    // Keyboard always claims user 0 as a connected gamepad
     if (user_index != 0) return X_ERROR_DEVICE_NOT_CONNECTED;
     if (out_caps) {
         std::memset(out_caps, 0, sizeof(*out_caps));
@@ -92,22 +128,46 @@ X_RESULT KeyboardInputDriver::GetCapabilities(uint32_t user_index,
 
 X_RESULT KeyboardInputDriver::GetState(uint32_t user_index,
                                         X_INPUT_STATE* out_state) {
-    // Keyboard always claims user 0
     if (user_index != 0) return X_ERROR_DEVICE_NOT_CONNECTED;
     if (out_state) {
-        uint16_t current = buttons_.load(std::memory_order_relaxed);
+        uint16_t current = 0;
+        uint8_t lt = 0, rt = 0;
+        int16_t lx = 0, ly = 0, rx = 0, ry = 0;
+
+#ifdef _WIN32
+        PollKeyboard(current, lt, rt);
+
+        // Merge real Xbox controller input via dynamically-loaded XInput
+        if (auto xig = GetXInputGetState()) {
+            XINPUT_STATE_S xi;
+            if (xig(0, &xi) == ERROR_SUCCESS) {
+                current |= xi.Gamepad.wButtons;
+                if (xi.Gamepad.bLeftTrigger > lt) lt = xi.Gamepad.bLeftTrigger;
+                if (xi.Gamepad.bRightTrigger > rt) rt = xi.Gamepad.bRightTrigger;
+                // Deadzone filtering for analog sticks
+                auto dz = [](int16_t v, int16_t d) -> int16_t {
+                    return (v > d || v < -d) ? v : 0;
+                };
+                lx = dz(xi.Gamepad.sThumbLX, 7849);
+                ly = dz(xi.Gamepad.sThumbLY, 7849);
+                rx = dz(xi.Gamepad.sThumbRX, 8689);
+                ry = dz(xi.Gamepad.sThumbRY, 8689);
+            }
+        }
+#endif
+
         if (current != prev_buttons_) {
             packet_number_++;
             prev_buttons_ = current;
         }
         out_state->packet_number = packet_number_;
         out_state->gamepad.buttons = current;
-        out_state->gamepad.left_trigger = left_trigger_.load(std::memory_order_relaxed);
-        out_state->gamepad.right_trigger = right_trigger_.load(std::memory_order_relaxed);
-        out_state->gamepad.thumb_lx = 0;
-        out_state->gamepad.thumb_ly = 0;
-        out_state->gamepad.thumb_rx = 0;
-        out_state->gamepad.thumb_ry = 0;
+        out_state->gamepad.left_trigger = lt;
+        out_state->gamepad.right_trigger = rt;
+        out_state->gamepad.thumb_lx = lx;
+        out_state->gamepad.thumb_ly = ly;
+        out_state->gamepad.thumb_rx = rx;
+        out_state->gamepad.thumb_ry = ry;
     }
     return X_ERROR_SUCCESS;
 }
