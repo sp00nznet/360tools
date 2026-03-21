@@ -31,11 +31,38 @@ KNOWN_OFFSETS = [
 
 
 def find_partition(f):
-    """Find the XDVDFS partition in the ISO."""
+    """Find the XDVDFS partition in the ISO.
+
+    The XDVDFS magic 'MICROSOFT*XBOX*MEDIA' appears at sector 32 (offset
+    0x10000) within the game partition. For XGD2 discs, the game partition
+    itself starts at 0x0FD90000. The root directory sector numbers in the
+    header are relative to the partition start, NOT to the magic location.
+
+    Returns the partition base offset (magic - 0x10000), or the magic offset
+    itself if the magic appears to be at the partition start (XBLA/extracted).
+    """
     for off in KNOWN_OFFSETS:
         f.seek(off)
         data = f.read(20)
         if data == MAGIC:
+            # Check if this is at sector 32 of a larger partition:
+            # read root dir info and test if data exists with base = off - 0x10000
+            f.seek(off + 20)
+            root_sector = struct.unpack('<I', f.read(4))[0]
+            root_size = struct.unpack('<I', f.read(4))[0]
+
+            # Try the adjusted base first (magic at sector 32)
+            adjusted_base = off - 0x10000
+            if adjusted_base >= 0 and root_sector > 0 and root_size > 0:
+                test_off = adjusted_base + root_sector * SECTOR_SIZE
+                fsize = f.seek(0, 2)
+                if test_off + root_size <= fsize:
+                    f.seek(test_off)
+                    sample = f.read(min(64, root_size))
+                    if any(b != 0 for b in sample):
+                        return adjusted_base
+
+            # Fall back to magic offset as base (works for XBLA/extracted ISOs)
             return off
 
     # Brute force scan
@@ -48,7 +75,24 @@ def find_partition(f):
         data = f.read(chunk_size)
         idx = data.find(MAGIC)
         if idx >= 0:
-            return pos + idx
+            magic_off = pos + idx
+            # Try adjusted base
+            adjusted = magic_off - 0x10000
+            if adjusted >= 0:
+                f.seek(adjusted)
+                test = f.read(20)
+                # Verify: re-check root with adjusted base
+                f.seek(magic_off + 20)
+                rs = struct.unpack('<I', f.read(4))[0]
+                rsz = struct.unpack('<I', f.read(4))[0]
+                test_off = adjusted + rs * SECTOR_SIZE
+                fsize = f.seek(0, 2)
+                if test_off + rsz <= fsize:
+                    f.seek(test_off)
+                    sample = f.read(min(64, rsz))
+                    if any(b != 0 for b in sample):
+                        return adjusted
+            return magic_off
         pos += chunk_size - 20
     return None
 
@@ -153,7 +197,17 @@ def main():
 
         print(f"XDVDFS partition at 0x{partition:08X}")
 
-        f.seek(partition + 20)
+        # The magic is at partition + 0x10000 (sector 32); read header from there
+        magic_offset = partition + 0x10000
+        f.seek(magic_offset)
+        magic_check = f.read(20)
+        if magic_check != MAGIC:
+            # Magic is at partition start (XBLA/extracted ISOs)
+            magic_offset = partition
+            f.seek(magic_offset + 20)
+        else:
+            f.seek(magic_offset + 20)
+
         root_sector = struct.unpack('<I', f.read(4))[0]
         root_size = struct.unpack('<I', f.read(4))[0]
         print(f"Root: sector {root_sector}, size {root_size}")
