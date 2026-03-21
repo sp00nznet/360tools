@@ -1,4 +1,4 @@
-// vig8 - Menu bar and config dialogs implementation
+// mygame - Menu bar and config dialogs implementation
 
 #include "menu.h"
 #include "settings.h"
@@ -42,7 +42,7 @@ static void RightAlignedButtons(float button_width = 80.0f) {
 class GraphicsDialog : public ImGuiDialog {
 public:
     GraphicsDialog(ImGuiDrawer* drawer, WindowedAppContext* app_context,
-                   Window* window, Vig8Settings* settings,
+                   Window* window, MyGameSettings* settings,
                    const std::filesystem::path& settings_path,
                    std::function<void()> on_done)
         : ImGuiDialog(drawer), app_context_(app_context), window_(window),
@@ -57,7 +57,7 @@ protected:
     void OnDraw(ImGuiIO& io) override {
         (void)io;
         ImGui::SetNextWindowSize(ImVec2(400, 220), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Graphics##vig8", nullptr,
+        if (ImGui::Begin("Graphics##mygame", nullptr,
                          ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoResize)) {
             ImGui::Text("Render Path:");
@@ -111,7 +111,7 @@ protected:
 private:
     WindowedAppContext* app_context_;
     Window* window_;
-    Vig8Settings* settings_;
+    MyGameSettings* settings_;
     std::filesystem::path settings_path_;
     std::function<void()> on_done_;
     int render_path_idx_ = 0;
@@ -125,7 +125,7 @@ private:
 
 class GameDialog : public ImGuiDialog {
 public:
-    GameDialog(ImGuiDrawer* drawer, Vig8Settings* settings,
+    GameDialog(ImGuiDrawer* drawer, MyGameSettings* settings,
                const std::filesystem::path& settings_path,
                std::function<void()> on_done)
         : ImGuiDialog(drawer), settings_(settings),
@@ -137,7 +137,7 @@ protected:
     void OnDraw(ImGuiIO& io) override {
         (void)io;
         ImGui::SetNextWindowSize(ImVec2(350, 140), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Game Options##vig8", nullptr,
+        if (ImGui::Begin("Game Options##mygame", nullptr,
                          ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoResize)) {
             ImGui::Checkbox("Unlock full game (skip trial mode)", &full_game_);
@@ -163,7 +163,7 @@ protected:
     }
 
 private:
-    Vig8Settings* settings_;
+    MyGameSettings* settings_;
     std::filesystem::path settings_path_;
     std::function<void()> on_done_;
     bool full_game_ = true;
@@ -175,7 +175,7 @@ private:
 
 class DebugDialog : public ImGuiDialog {
 public:
-    DebugDialog(ImGuiDrawer* drawer, Vig8Settings* settings,
+    DebugDialog(ImGuiDrawer* drawer, MyGameSettings* settings,
                 const std::filesystem::path& settings_path,
                 std::function<void()> on_done)
         : ImGuiDialog(drawer), settings_(settings),
@@ -190,7 +190,7 @@ protected:
     void OnDraw(ImGuiIO& io) override {
         (void)io;
         ImGui::SetNextWindowSize(ImVec2(370, 240), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Debug Options##vig8", nullptr,
+        if (ImGui::Begin("Debug Options##mygame", nullptr,
                          ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoResize)) {
             ImGui::Checkbox("Show FPS overlay", &show_fps_);
@@ -226,7 +226,7 @@ protected:
     }
 
 private:
-    Vig8Settings* settings_;
+    MyGameSettings* settings_;
     std::filesystem::path settings_path_;
     std::function<void()> on_done_;
     bool show_fps_ = true;
@@ -264,7 +264,7 @@ static std::vector<PhysicalController> EnumerateControllers() {
 
 class ControlsDialog : public ImGuiDialog {
 public:
-    ControlsDialog(ImGuiDrawer* drawer, Vig8Settings* settings,
+    ControlsDialog(ImGuiDrawer* drawer, MyGameSettings* settings,
                    const std::filesystem::path& settings_path,
                    std::function<void()> on_done)
         : ImGuiDialog(drawer), settings_(settings),
@@ -280,7 +280,7 @@ protected:
     void OnDraw(ImGuiIO& io) override {
         (void)io;
         ImGui::SetNextWindowSize(ImVec2(590, 280), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Controllers##vig8", nullptr,
+        if (ImGui::Begin("Controllers##mygame", nullptr,
                          ImGuiWindowFlags_NoCollapse |
                          ImGuiWindowFlags_NoResize)) {
 
@@ -446,22 +446,22 @@ private:
         settings_->connected_2 = connected_[1];
         settings_->connected_3 = connected_[2];
         settings_->connected_4 = connected_[3];
-        g_vig8_user_connected[0] = true;
-        g_vig8_user_connected[1] = connected_[1];
-        g_vig8_user_connected[2] = connected_[2];
-        g_vig8_user_connected[3] = connected_[3];
+        g_game_user_connected[0] = true;
+        g_game_user_connected[1] = connected_[1];
+        g_game_user_connected[2] = connected_[2];
+        g_game_user_connected[3] = connected_[3];
 
         // Notify the game that sign-in state changed so it re-queries
         auto* ks = rex::kernel::kernel_state();
         if (ks) {
             uint32_t mask = 0;
             for (int i = 0; i < 4; i++)
-                if (g_vig8_user_connected[i]) mask |= (1u << i);
+                if (g_game_user_connected[i]) mask |= (1u << i);
             ks->BroadcastNotification(0x0000000A, mask);  // XN_SYS_SIGNINCHANGED
         }
     }
 
-    Vig8Settings* settings_;
+    MyGameSettings* settings_;
     std::filesystem::path settings_path_;
     std::function<void()> on_done_;
     std::vector<PhysicalController> physical_;
@@ -478,7 +478,7 @@ struct MenuSystem::Impl {
     Window* window;
     WindowedAppContext* app_context;
     rex::Runtime* runtime;
-    Vig8Settings* settings;
+    MyGameSettings* settings;
     std::filesystem::path settings_path;
     std::function<void()> on_settings_changed;
 
@@ -527,10 +527,10 @@ struct MenuSystem::Impl {
     void ShowAbout() {
         ImGuiDialog::ShowMessageBox(
             imgui_drawer,
-            "About Vigilante 8 Arcade",
-            "Vigilante 8 Arcade - Static Recompilation\n\n"
+            "About Xbox 360 Recompiled Game",
+            "Xbox 360 Recompiled Game - Static Recompilation\n\n"
             "Built with ReXGlue SDK\n"
-            "https://github.com/sp00nznet/vig8");
+            "https://github.com/YOUR_USER/YOUR_GAME");
     }
 
     void SaveState() {
@@ -552,7 +552,7 @@ struct MenuSystem::Impl {
         }
 
         // Write only the bytes that were used
-        auto save_path = settings_path.parent_path() / "vig8_savestate.bin";
+        auto save_path = settings_path.parent_path() / "mygame_savestate.bin";
         std::ofstream f(save_path, std::ios::binary);
         if (!f) {
             ImGuiDialog::ShowMessageBox(imgui_drawer, "Save State",
@@ -583,7 +583,7 @@ struct MenuSystem::Impl {
 MenuSystem::MenuSystem(ImGuiDrawer* imgui_drawer, Window* window,
                        WindowedAppContext* app_context,
                        rex::Runtime* runtime,
-                       Vig8Settings* settings,
+                       MyGameSettings* settings,
                        const std::filesystem::path& settings_path,
                        std::function<void()> on_settings_changed)
     : impl_(std::make_unique<Impl>()) {

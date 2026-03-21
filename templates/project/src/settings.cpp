@@ -1,12 +1,12 @@
-// vig8 - Settings persistence implementation
+// mygame - Settings persistence implementation
 
 #include "settings.h"
 
 #include <toml++/toml.hpp>
 #include <fstream>
 
-Vig8Settings LoadSettings(const std::filesystem::path& path) {
-    Vig8Settings s;
+MyGameSettings LoadSettings(const std::filesystem::path& path) {
+    MyGameSettings s;
     if (!std::filesystem::exists(path)) return s;
 
     try {
@@ -44,7 +44,7 @@ Vig8Settings LoadSettings(const std::filesystem::path& path) {
     return s;
 }
 
-void SaveSettings(const std::filesystem::path& path, const Vig8Settings& s) {
+void SaveSettings(const std::filesystem::path& path, const MyGameSettings& s) {
     std::ofstream f(path);
     if (!f) return;
 

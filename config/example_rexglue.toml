@@ -1,7 +1,7 @@
-# Vigilante 8 Arcade - ReXGlue Configuration
-# Migrated from XenonRecomp config
+# Xbox 360 Recompiled Game - ReXGlue Configuration
+# Example configuration - replace addresses with your game's values
 
-project_name = "vig8"
+project_name = "mygame"
 file_path = "../extracted/default.xex"
 out_directory_path = "../generated"
 

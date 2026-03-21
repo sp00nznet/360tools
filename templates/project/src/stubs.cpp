@@ -1,8 +1,8 @@
-// Missing kernel stubs for Vigilante 8 Arcade
+// Missing kernel stubs for Xbox 360 Recompiled Game
 // These are Xbox 360 APIs not yet implemented in the ReXGlue SDK.
 // Most are non-essential: networking, USB camera, and UI dialogs.
 
-#include "vig8_config.h"
+#include "mygame_config.h"
 #include "settings.h"
 #include <rex/runtime/guest/context.h>
 #include <rex/runtime/guest/memory.h>
@@ -12,28 +12,29 @@
 using namespace rex::runtime::guest;
 
 // Global debug flags (set from ApplySettings in main.cpp)
-bool g_vig8_invulnerable = false;
-bool g_vig8_unlock_all_cars = false;
+// TODO: Replace with game-specific cheats
+bool g_game_cheat_1 = false;
+bool g_game_cheat_2 = false;
 
 // Per-slot sign-in state: player 1 always connected, others opt-in
-bool g_vig8_user_connected[4] = {true, false, false, false};
+bool g_game_user_connected[4] = {true, false, false, false};
 
 // Simple stub macro that returns a value
-#define VIG8_STUB_RETURN(name, val) \
+#define GAME_STUB_RETURN(name, val) \
     extern "C" PPC_FUNC(name) { (void)base; ctx.r3.u64 = (val); }
 
-#define VIG8_STUB(name) VIG8_STUB_RETURN(name, 0)
+#define GAME_STUB(name) GAME_STUB_RETURN(name, 0)
 
 // Networking overrides moved to net.cpp:
 //   XNetUnregisterInAddr, XNetConnect, XNetGetConnectStatus,
 //   XNetQosLookup, WSAGetOverlappedResult, and others.
 
 // XAM UI stubs
-VIG8_STUB(__imp__XamShowGamerCardUIForXUID)
-VIG8_STUB(__imp__XamShowAchievementsUI)
-VIG8_STUB(__imp__XamShowMarketplaceUI)
-VIG8_STUB_RETURN(__imp__XamUserCreateStatsEnumerator, 1)  // fail = no stats
-VIG8_STUB(__imp__XamVoiceSubmitPacket)
+GAME_STUB(__imp__XamShowGamerCardUIForXUID)
+GAME_STUB(__imp__XamShowAchievementsUI)
+GAME_STUB(__imp__XamShowMarketplaceUI)
+GAME_STUB_RETURN(__imp__XamUserCreateStatsEnumerator, 1)  // fail = no stats
+GAME_STUB(__imp__XamVoiceSubmitPacket)
 
 // Content license — override the weak wrapper sub_823245B0 to return full
 // license mask, bypassing the SDK's XamContentGetLicenseMask (which returns
@@ -49,19 +50,19 @@ extern "C" PPC_FUNC(sub_823245B0) {
 }
 
 // Kernel memory allocation
-VIG8_STUB(__imp__ExAllocatePoolWithTag)  // NULL = allocation failed
+GAME_STUB(__imp__ExAllocatePoolWithTag)  // NULL = allocation failed
 
 // USB Camera stubs (XUsbcam*)
-VIG8_STUB_RETURN(__imp__XUsbcamCreate, 1)  // fail
-VIG8_STUB(__imp__XUsbcamDestroy)
-VIG8_STUB(__imp__XUsbcamGetState)
-VIG8_STUB_RETURN(__imp__XUsbcamSetConfig, 1)
-VIG8_STUB_RETURN(__imp__XUsbcamSetView, 1)
-VIG8_STUB_RETURN(__imp__XUsbcamSetCaptureMode, 1)
-VIG8_STUB_RETURN(__imp__XUsbcamReadFrame, 1)
+GAME_STUB_RETURN(__imp__XUsbcamCreate, 1)  // fail
+GAME_STUB(__imp__XUsbcamDestroy)
+GAME_STUB(__imp__XUsbcamGetState)
+GAME_STUB_RETURN(__imp__XUsbcamSetConfig, 1)
+GAME_STUB_RETURN(__imp__XUsbcamSetView, 1)
+GAME_STUB_RETURN(__imp__XUsbcamSetCaptureMode, 1)
+GAME_STUB_RETURN(__imp__XUsbcamReadFrame, 1)
 
 // ObReferenceObject - reference counting stub
-VIG8_STUB(__imp__ObReferenceObject)
+GAME_STUB(__imp__ObReferenceObject)
 
 // ============================================================================
 // Multi-user sign-in overrides (local multiplayer support)
@@ -87,7 +88,7 @@ static const char* kUserNames[4] = {
 // Return 1 (signed in locally) for connected user indices only.
 extern "C" PPC_FUNC(__imp__XamUserGetSigninState) {
     uint32_t user_index = ctx.r3.u32;
-    ctx.r3.u64 = (user_index < 4 && g_vig8_user_connected[user_index]) ? 1 : 0;
+    ctx.r3.u64 = (user_index < 4 && g_game_user_connected[user_index]) ? 1 : 0;
 }
 
 // XamUserGetSigninInfo(user_index, flags, info_ptr) -> HRESULT
@@ -111,7 +112,7 @@ extern "C" PPC_FUNC(__imp__XamUserGetSigninInfo) {
     // Zero the struct
     std::memset(base + info_ptr, 0, 40);
 
-    if (user_index >= 4 || !g_vig8_user_connected[user_index]) {
+    if (user_index >= 4 || !g_game_user_connected[user_index]) {
         ctx.r3.u64 = 0x80070490;  // X_E_NO_SUCH_USER
         return;
     }
@@ -136,7 +137,7 @@ extern "C" PPC_FUNC(__imp__XamUserGetXUID) {
         return;
     }
 
-    if (user_index >= 4 || !g_vig8_user_connected[user_index]) {
+    if (user_index >= 4 || !g_game_user_connected[user_index]) {
         PPC_STORE_U64(xuid_ptr, 0);
         ctx.r3.u64 = (user_index >= 4) ? 0x80070057 : 0x80070490;
         return;
@@ -152,7 +153,7 @@ extern "C" PPC_FUNC(__imp__XamUserGetName) {
     uint32_t buffer_ptr = ctx.r4.u32;
     uint32_t buffer_len = ctx.r5.u32;
 
-    if (user_index >= 4 || !g_vig8_user_connected[user_index]) {
+    if (user_index >= 4 || !g_game_user_connected[user_index]) {
         ctx.r3.u64 = (user_index >= 4) ? 0x80070057 : 0x80070490;
         return;
     }
@@ -202,7 +203,7 @@ extern "C" PPC_FUNC(__imp__XamShowSigninUI) {
     if (ks) {
         uint32_t mask = 0;
         for (int i = 0; i < 4; i++)
-            if (g_vig8_user_connected[i]) mask |= (1u << i);
+            if (g_game_user_connected[i]) mask |= (1u << i);
         // XN_SYS_SIGNINCHANGED
         ks->BroadcastNotification(0x0000000A, mask);
         // XN_SYS_UI off
@@ -218,25 +219,25 @@ extern "C" PPC_FUNC(__imp__XamUserIsOnlineEnabled) {
 }
 
 // ============================================================================
-// Vehicle unlock override
+// Game-specific unlock override (example)
 // ============================================================================
-// sub_821B80F0 reads vehicle data structures. At offset 196, bits 12-15
-// (mask 0xF0000) indicate the vehicle is unlocked. If those bits are 0,
-// the vehicle is locked (skipped). We override the weak symbol to force
-// those bits set before calling the original implementation.
-
-// Forward-declare the generated implementation
-extern "C" void __imp__sub_821B80F0(PPCContext& ctx, uint8_t* base);
-
-extern "C" PPC_FUNC(sub_821B80F0) {
-    if (g_vig8_unlock_all_cars) {
-        uint32_t struct_ptr = ctx.r3.u32;
-        if (struct_ptr) {
-            uint32_t val = PPC_LOAD_U32(struct_ptr + 196);
-            val |= 0xF0000;  // force bits 12-15 set = unlocked
-            PPC_STORE_U32(struct_ptr + 196, val);
-        }
-    }
-    // Call original implementation
-    __imp__sub_821B80F0(ctx, base);
-}
+// TODO: Replace with game-specific unlock logic. This example shows how to
+// override a weak PPC_FUNC symbol to modify game data before calling the
+// original implementation.
+//
+// Example: override sub_XXXXXXXX to force-unlock items by setting bits in a
+// data structure before the original function reads them.
+//
+// extern "C" void __imp__sub_XXXXXXXX(PPCContext& ctx, uint8_t* base);
+//
+// extern "C" PPC_FUNC(sub_XXXXXXXX) {
+//     if (g_game_cheat_2) {
+//         uint32_t struct_ptr = ctx.r3.u32;
+//         if (struct_ptr) {
+//             uint32_t val = PPC_LOAD_U32(struct_ptr + OFFSET);
+//             val |= UNLOCK_MASK;
+//             PPC_STORE_U32(struct_ptr + OFFSET, val);
+//         }
+//     }
+//     __imp__sub_XXXXXXXX(ctx, base);
+// }

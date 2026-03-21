@@ -1,8 +1,8 @@
 // Minimal console test for ReXGlue Runtime initialization
 // This skips the windowed app framework to isolate crashes
 
-#include "vig8_config.h"
-#include "vig8_init.h"
+#include "mygame_config.h"
+#include "mygame_init.h"
 
 #include <rex/runtime.h>
 #include <rex/logging.h>
@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
     if (argc > 1) {
         game_dir = argv[1];
     } else {
-        game_dir = "E:/vig8/extracted";
+        game_dir = "./assets";
     }
 
     fprintf(stderr, "[test] Game dir: %s\n", game_dir.string().c_str());

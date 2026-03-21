@@ -1,8 +1,8 @@
-// vig8 - ReXGlue Recompiled Project
-// Vigilante 8 Arcade Static Recompilation
+// mygame - ReXGlue Recompiled Project
+// Xbox 360 Recompiled Game
 
-#include "vig8_config.h"
-#include "vig8_init.h"
+#include "mygame_config.h"
+#include "mygame_init.h"
 #include "settings.h"
 #include "menu.h"
 #include "net.h"
@@ -45,7 +45,7 @@ static std::mutex g_crash_mutex;
 static void crash_log_write(const char* fmt, ...) {
     std::lock_guard<std::mutex> lock(g_crash_mutex);
     if (!g_crash_log) {
-        g_crash_log = fopen("E:\\vig8\\vig8_crash.log", "a");
+        g_crash_log = fopen("mygame_crash.log", "a");
         if (!g_crash_log) return;
     }
     va_list ap;
@@ -62,13 +62,13 @@ static void crash_log_write(const char* fmt, ...) {
 // Redirect stderr to a log file for GUI app crash diagnostics
 static struct StderrRedirect_ {
     StderrRedirect_() {
-        freopen("E:\\vig8\\vig8_stderr.log", "w", stderr);
-        fprintf(stderr, "[vig8] stderr redirected to log file\n");
+        freopen("mygame_stderr.log", "w", stderr);
+        fprintf(stderr, "[mygame] stderr redirected to log file\n");
         fflush(stderr);
         // Also open dedicated crash log
-        g_crash_log = fopen("E:\\vig8\\vig8_crash.log", "w");
+        g_crash_log = fopen("mygame_crash.log", "w");
         if (g_crash_log) {
-            fprintf(g_crash_log, "[vig8] Crash log initialized\n");
+            fprintf(g_crash_log, "[mygame] Crash log initialized\n");
             fflush(g_crash_log);
         }
         // Set terminate handler for uncaught C++ exceptions
@@ -307,16 +307,16 @@ protected:
     }
 };
 
-class Vig8App : public rex::ui::WindowedApp,
+class MyGameApp : public rex::ui::WindowedApp,
                 public rex::ui::WindowListener,
                 public rex::ui::WindowInputListener {
 public:
     static std::unique_ptr<rex::ui::WindowedApp> Create(rex::ui::WindowedAppContext& ctx) {
-        return std::make_unique<Vig8App>(ctx);
+        return std::make_unique<MyGameApp>(ctx);
     }
 
-    Vig8App(rex::ui::WindowedAppContext& ctx)
-        : WindowedApp(ctx, "vig8", "[game_directory]") {
+    MyGameApp(rex::ui::WindowedAppContext& ctx)
+        : WindowedApp(ctx, "mygame", "[game_directory]") {
         AddPositionalOption("game_directory");
     }
 
@@ -331,9 +331,9 @@ public:
             game_dir = exe_dir / "assets";
         }
 
-        // Load user settings from vig8_settings.toml
+        // Load user settings from mygame_settings.toml
         settings_path_ = std::filesystem::absolute(game_dir).parent_path()
-                          / "vig8_settings.toml";
+                          / "mygame_settings.toml";
         settings_ = LoadSettings(settings_path_);
 
         // Apply render path from settings (before runtime init)
@@ -345,8 +345,8 @@ public:
         REXCVAR_SET(draw_resolution_scale_y, settings_.resolution_scale);
 
         // Apply debug flags
-        g_vig8_invulnerable = settings_.invulnerable;
-        g_vig8_unlock_all_cars = settings_.unlock_all_cars;
+        g_game_cheat_1 = settings_.invulnerable;
+        g_game_cheat_2 = settings_.unlock_all_cars;
 
         // Hide console on startup if configured
         ApplyConsoleVisibility(settings_.show_console);
@@ -361,7 +361,7 @@ public:
             log_level_str, {});
         rex::InitLogging(log_config);
         rex::RegisterLogLevelCallback();
-        REXLOG_INFO("vig8 starting");
+        REXLOG_INFO("mygame starting");
         REXLOG_INFO("  Game directory: {}", game_dir.string());
 
         // Create and initialize runtime
@@ -387,7 +387,7 @@ public:
         }
 
         // Create window
-        window_ = rex::ui::Window::Create(app_context(), "Vigilante 8 Arcade", 1280, 720);
+        window_ = rex::ui::Window::Create(app_context(), "Xbox 360 Recompiled Game", 1280, 720);
         if (!window_) {
             REXLOG_ERROR("Failed to create window");
             return false;
@@ -551,14 +551,14 @@ private:
         ApplyConsoleVisibility(settings_.show_console);
 
         // Debug flags
-        g_vig8_invulnerable = settings_.invulnerable;
-        g_vig8_unlock_all_cars = settings_.unlock_all_cars;
+        g_game_cheat_1 = settings_.invulnerable;
+        g_game_cheat_2 = settings_.unlock_all_cars;
 
         // Multi-user sign-in state
-        g_vig8_user_connected[0] = true;
-        g_vig8_user_connected[1] = settings_.connected_2;
-        g_vig8_user_connected[2] = settings_.connected_3;
-        g_vig8_user_connected[3] = settings_.connected_4;
+        g_game_user_connected[0] = true;
+        g_game_user_connected[1] = settings_.connected_2;
+        g_game_user_connected[2] = settings_.connected_3;
+        g_game_user_connected[3] = settings_.connected_4;
 
         // Render path changes require restart (just saved to file)
         REXLOG_INFO("Settings applied (render_path={}, show_fps={}, full_game={}, "
@@ -579,8 +579,8 @@ private:
     std::unique_ptr<rex::ui::ImGuiDrawer> imgui_drawer_;
     std::unique_ptr<DebugOverlayDialog> debug_overlay_;
     std::unique_ptr<MenuSystem> menu_system_;
-    Vig8Settings settings_;
+    MyGameSettings settings_;
     std::filesystem::path settings_path_;
 };
 
-XE_DEFINE_WINDOWED_APP(vig8, Vig8App::Create)
+XE_DEFINE_WINDOWED_APP(mygame, MyGameApp::Create)

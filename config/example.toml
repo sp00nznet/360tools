@@ -1,10 +1,10 @@
-# Vigilante 8 Arcade - XenonRecomp Configuration
-# Generated: 2026-02-17
+# Xbox 360 Recompiled Game - XenonRecomp Configuration
+# Example configuration - replace addresses with your game's values
 
 [main]
 file_path = "../extracted/default.xex"
 out_directory_path = "../ppc"
-switch_table_file_path = "vig8_switch_tables.toml"
+switch_table_file_path = "mygame_switch_tables.toml"
 
 # ABI Register Save/Restore Addresses
 # Found by scanning the XEX binary for standard PPC ABI function patterns

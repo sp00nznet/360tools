@@ -1,4 +1,4 @@
-// vig8 - Menu bar and config dialogs
+// mygame - Menu bar and config dialogs
 // Native Win32 menu bar + ImGui config dialogs for settings management
 
 #pragma once
@@ -18,7 +18,7 @@ class Window;
 class WindowedAppContext;
 }
 
-struct Vig8Settings;
+struct MyGameSettings;
 
 class MenuSystem {
 public:
@@ -26,7 +26,7 @@ public:
                rex::ui::Window* window,
                rex::ui::WindowedAppContext* app_context,
                rex::Runtime* runtime,
-               Vig8Settings* settings,
+               MyGameSettings* settings,
                const std::filesystem::path& settings_path,
                std::function<void()> on_settings_changed);
     ~MenuSystem();

@@ -36,6 +36,9 @@ No emulator. No interpreter. No JIT. Just your Xbox 360 game, recompiled to C++ 
 | **`extract_switch_tables.py`** | Finds PPC switch/jump tables by pattern-matching `add r12,r12,r0; mtctr r12; bctr` sequences, reads the table data, and generates `[[switch]]` TOML entries. Handles u8/u16 entries, scaling, bounds checking. |
 | **`find_missing_vtable_funcs.py`** | Scans the PE data section for C++ vtable entries pointing to functions that XenonRecomp missed (because they're never called directly -- only through vtable dispatch). Classifies entries as THUNK or FUNC. |
 | **`parse_xex_imports.py`** | Parses XEX2 import tables to identify which kernel/XAM functions the game actually calls. Helps you know which stubs you need to implement. |
+| **`xex_info.py`** | Quick XEX2 header dumper -- parses and displays all header fields, security info, import libraries, static libraries, and a recompilation summary. Great for initial triage before running the full pipeline. |
+| **`extract_xex_direct.py`** | Brute-force XEX2 extractor that finds XEX2 magic in STFS containers and rebuilds the contiguous data stream (stripping hash table blocks). Useful fallback when `extract_stfs.py`'s block algorithm fails on unusual packages. |
+| **`post_codegen.py`** | Re-applies safety macro overrides (`PPC_CALL_INDIRECT_FUNC`, `PPC_UNIMPLEMENTED`) to the generated `*_init.h` after codegen regenerates it. Run after every `rexglue codegen` pass. |
 | **`dump_pe.cpp`** | C++ XEX-to-PE extractor using XenonUtils. Faster than the Python version if you've already built XenonRecomp. |
 
 ### `patches/` -- XenonRecomp Fixes
@@ -88,7 +91,7 @@ Reference TOML configurations for XenonRecomp and ReXGlue codegen, with comments
 
 ### Prerequisites
 
-- **Python 3.8+** with `pycryptodome` (`pip install pycryptodome`)
+- **Python 3.8+** with dependencies: `pip install -r requirements.txt`
 - **CMake 3.20+**, **Ninja**, **Clang 18+** (clang-cl on Windows)
 - **MSVC 2022** (for Windows SDK headers)
 - **Git** (for cloning XenonRecomp and ReXGlue)
@@ -177,6 +180,7 @@ If you're getting white screens with certain render target formats (especially `
 | **Crazy Taxi** (XBLA, 2010) | [ctxbla](https://github.com/sp00nznet/ctxbla) | Playable -- D3D12 rendering, keyboard + XInput, arcade mode. In-game audio (XMA) in progress |
 | **Comix Zone** (XBLA, 2009) | [comixzone](https://github.com/sp00nznet/comixzone) | Analysis -- binary extracted, 11,824 functions generated, runtime scaffold pending |
 | **Virtual On: Oratorio Tangram** (XBLA) | [voot](https://github.com/sp00nznet/voot) | Foundation -- project structure, codegen config ready |
+| **Saints Row** (Xbox 360, 2006) | [saintsrow](https://github.com/sp00nznet/saintsrow) | Planning -- ISO extracted, binary analysis pending |
 
 ## The Stack
 

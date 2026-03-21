@@ -11,8 +11,7 @@ import struct
 import sys
 import os
 
-PE_BASE = 0x82000000
-PE_FILE = os.path.join(os.path.dirname(__file__), "..", "extracted", "default_pe.exe")
+DEFAULT_PE_BASE = 0x82000000
 
 # Pattern: add r12,r12,r0 (7D8C0214) + mtctr r12 (7D8903A6) + bctr (4E800420)
 PATTERN = bytes.fromhex("7D8C0214" "7D8903A6" "4E800420")
@@ -54,7 +53,7 @@ def decode_insn(data, offset):
     }
 
 
-def find_switch_info(data, add_offset):
+def find_switch_info(data, add_offset, pe_base=0x82000000, code_end=None):
     """
     Given the file offset of 'add r12,r12,r0', look backward to find:
     - table_addr: from first lis r12 + addi r12 pair (before lhzx/lbzx)
@@ -274,8 +273,9 @@ def find_switch_info(data, add_offset):
     if table_size is None:
         # Fallback: try to infer from table data
         # Read entries until we get unreasonable targets
-        table_file_off = (table_addr - PE_BASE)
+        table_file_off = (table_addr - pe_base)
         max_reasonable = 512
+        max_code = code_end if code_end else pe_base + len(data)
         table_size = 0
         for idx in range(max_reasonable):
             if entry_type == 'u16':
@@ -291,7 +291,7 @@ def find_switch_info(data, add_offset):
 
             target = (base_addr + entry_val * entry_scale) & 0xFFFFFFFF
             # Check if target is in code range and 4-byte aligned (PPC instructions)
-            if target < 0x82000000 or target >= 0x82300000:
+            if target < pe_base or target >= max_code:
                 break
             if (target & 3) != 0:
                 break
@@ -311,37 +311,51 @@ def find_switch_info(data, add_offset):
 
 
 def main():
-    pe_file = PE_FILE
-    if len(sys.argv) > 1:
-        pe_file = sys.argv[1]
+    import argparse
+    import json
 
-    with open(pe_file, 'rb') as f:
+    parser = argparse.ArgumentParser(
+        description='Extract switch/jump tables from an Xbox 360 PE image and generate TOML config.')
+    parser.add_argument('pe_image', help='Path to the decompressed PE image')
+    parser.add_argument('--base', type=lambda x: int(x, 0), default=DEFAULT_PE_BASE,
+                        help='PE base address (default: 0x82000000)')
+    parser.add_argument('--code-end', type=lambda x: int(x, 0), default=None,
+                        help='End of code range (default: base + image size)')
+    parser.add_argument('--overrides', type=str, default=None,
+                        help='JSON file with size overrides: {"0xADDR": size, ...}')
+    parser.add_argument('--excludes', type=str, default=None,
+                        help='JSON file with bctr addresses to exclude: ["0xADDR", ...]')
+    parser.add_argument('--game-name', type=str, default=None,
+                        help='Game name for TOML output header comment')
+    args = parser.parse_args()
+
+    PE_BASE = args.base
+
+    with open(args.pe_image, 'rb') as f:
         data = f.read()
 
-    print(f"# Loaded {len(data)} bytes from {pe_file}")
+    print(f"# Loaded {len(data)} bytes from {args.pe_image}")
     print(f"# Scanning for switch table pattern: add r12,r12,r0; mtctr r12; bctr")
     print()
 
     # Manual overrides for tables where auto-detection fails
     # (bounds check too far away, uses bgtlr, or no explicit bounds check)
-    SIZE_OVERRIDES = {
-        0x82140EB0: 29,   # inflate: state 0-28, no bounds check (struct field)
-        0x82147BC0: 30,   # cmplwi cr6,r11,29 + bgtlr cr6
-        0x820B53D8: 241,  # cmplwi cr6,r10,240 + bgt cr6
-        0x820B4FDC: 188,  # cmplwi cr6,r3,187 + bgt cr6
-    }
+    # Load from JSON file if provided, otherwise empty
+    SIZE_OVERRIDES = {}
+    if args.overrides:
+        with open(args.overrides, 'r') as f:
+            raw = json.load(f)
+        SIZE_OVERRIDES = {int(k, 0): v for k, v in raw.items()}
 
     # Cross-function switches: bctr is in a small trampoline function but targets
     # are in a different (larger) function. XenonRecomp can't generate goto for
     # cross-function jumps, so exclude these and let PPC_CALL_INDIRECT_FUNC handle them.
-    EXCLUDE_BCTRS = {
-        0x820D6660,   # targets in sub_820D6664
-        0x82147BC0,   # targets in sub_82147BC4
-        0x821499E4,   # targets in sub_821499E8
-        0x8214B160,   # targets in sub_8214B164
-        0x8214B314,   # targets in sub_8214B318
-        0x82257B60,   # targets in sub_82257B64
-    }
+    # Load from JSON file if provided, otherwise empty
+    EXCLUDE_BCTRS = set()
+    if args.excludes:
+        with open(args.excludes, 'r') as f:
+            raw = json.load(f)
+        EXCLUDE_BCTRS = {int(x, 0) for x in raw}
 
     switches = []
     pos = 0
@@ -354,8 +368,9 @@ def main():
         bctr_offset = idx + 8
         bctr_addr = bctr_offset + PE_BASE
 
-        # Verify this is within code range
-        if bctr_addr < 0x82000000 or bctr_addr >= 0x82300000:
+        # Verify this is within image range
+        code_end = args.code_end if args.code_end else PE_BASE + len(data)
+        if bctr_addr < PE_BASE or bctr_addr >= code_end:
             pos = idx + 4
             continue
 
@@ -364,7 +379,7 @@ def main():
             pos = idx + 12
             continue
 
-        info = find_switch_info(data, add_offset)
+        info = find_switch_info(data, add_offset, pe_base=PE_BASE, code_end=code_end)
 
         # Apply manual size override if available
         if info and bctr_addr in SIZE_OVERRIDES:
@@ -396,7 +411,8 @@ def main():
         pos = idx + 12
 
     # Output TOML
-    print(f"# Auto-generated switch tables for Crazy Taxi (XBLA)")
+    game_label = args.game_name if args.game_name else os.path.basename(args.pe_image)
+    print(f"# Auto-generated switch tables for {game_label}")
     print(f"# Found {len(switches)} switch table sites")
     print()
 

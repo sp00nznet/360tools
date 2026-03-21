@@ -1,6 +1,7 @@
-# Vigilante 8 Arcade - ReXGlue Static Recompilation Project
+# Xbox 360 Static Recompilation Project Template
+# Replace "mygame" with your project name throughout this file.
 cmake_minimum_required(VERSION 3.25)
-project(vig8 LANGUAGES C CXX)
+project(mygame LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,7 +30,7 @@ endif()
 
 # Main executable
 if(WIN32)
-    add_executable(vig8 WIN32
+    add_executable(mygame WIN32
         src/main.cpp
         src/stubs.cpp
         src/settings.cpp
@@ -39,7 +40,7 @@ if(WIN32)
         ${GENERATED_SOURCES}
     )
 else()
-    add_executable(vig8
+    add_executable(mygame
         src/main.cpp
         src/stubs.cpp
         src/settings.cpp
@@ -50,11 +51,11 @@ else()
     )
 endif()
 
-target_include_directories(vig8 PRIVATE
+target_include_directories(mygame PRIVATE
     ${CMAKE_SOURCE_DIR}/../generated
 )
 
-target_link_libraries(vig8 PRIVATE
+target_link_libraries(mygame PRIVATE
     rex::core
     rex::runtime
     rex::kernel
@@ -63,7 +64,7 @@ target_link_libraries(vig8 PRIVATE
 )
 
 # Compile options matching rexglue requirements
-target_compile_options(vig8 PRIVATE
+target_compile_options(mygame PRIVATE
     -fno-strict-aliasing
     -ffp-model=strict
     -fno-char8_t
@@ -74,7 +75,7 @@ target_compile_options(vig8 PRIVATE
 )
 
 if(NOT MSVC)
-    target_compile_options(vig8 PRIVATE -msse4.1)
+    target_compile_options(mygame PRIVATE -msse4.1)
 endif()
 
 # Allow our stubs.cpp to override XAM user functions from rexkernel.lib.
@@ -82,27 +83,27 @@ endif()
 # XamUserReadProfileSettings), so /force:multiple lets our definitions
 # take precedence over the library's.
 if(WIN32)
-    target_link_options(vig8 PRIVATE "LINKER:/force:multiple")
+    target_link_options(mygame PRIVATE "LINKER:/force:multiple")
 endif()
 
 # Console test executable (no GUI)
-add_executable(vig8_test
+add_executable(mygame_test
     src/test_boot.cpp
     src/stubs.cpp
     src/net.cpp
     ${GENERATED_SOURCES}
 )
-target_include_directories(vig8_test PRIVATE
+target_include_directories(mygame_test PRIVATE
     ${CMAKE_SOURCE_DIR}/../generated
 )
-target_link_libraries(vig8_test PRIVATE
+target_link_libraries(mygame_test PRIVATE
     rex::core
     rex::runtime
     rex::kernel
     rex::graphics
     rex::ui
 )
-target_compile_options(vig8_test PRIVATE
+target_compile_options(mygame_test PRIVATE
     -fno-strict-aliasing
     -ffp-model=strict
     -fno-char8_t
@@ -110,17 +111,17 @@ target_compile_options(vig8_test PRIVATE
     $<$<CONFIG:RELEASE>:-DNDEBUG>
 )
 if(NOT MSVC)
-    target_compile_options(vig8_test PRIVATE -msse4.1)
+    target_compile_options(mygame_test PRIVATE -msse4.1)
 endif()
 
 if(WIN32)
-    target_link_options(vig8_test PRIVATE "LINKER:/force:multiple")
+    target_link_options(mygame_test PRIVATE "LINKER:/force:multiple")
 endif()
 
 # Whole-archive link for kernel hooks on Linux
 if(NOT WIN32)
-    target_link_options(vig8 PRIVATE
+    target_link_options(mygame PRIVATE
         -Wl,--whole-archive $<TARGET_FILE:rex::kernel> -Wl,--no-whole-archive
     )
-    target_compile_options(vig8 PRIVATE -mcmodel=large)
+    target_compile_options(mygame PRIVATE -mcmodel=large)
 endif()

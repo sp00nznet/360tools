@@ -10,10 +10,11 @@
 // Game-specific constants -- update these for your game's PE layout.
 // Run find_abi_addrs.py on your PE image to get these values.
 // ============================================================================
-#define PPC_IMAGE_BASE 0x82000000ull
-#define PPC_IMAGE_SIZE 0x4E0000ull
-#define PPC_CODE_BASE 0x82090000ull
-#define PPC_CODE_SIZE 0x2FD8F8ull
+// TODO: Replace these with your game's actual values from PE analysis
+#define PPC_IMAGE_BASE 0x82000000ull  // Standard Xbox 360 image base
+#define PPC_IMAGE_SIZE 0x000000ull    // Total PE image size
+#define PPC_CODE_BASE  0x82000000ull  // Start of .text section
+#define PPC_CODE_SIZE  0x000000ull    // Size of code section
 
 // ============================================================================
 // Override __builtin_trap() for switch-case defaults.

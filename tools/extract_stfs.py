@@ -181,9 +181,11 @@ def extract_live_pirs(input_path, output_dir):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        input_path = r'E:\vig8\Vigilante 8 Arcade'
-    else:
-        input_path = sys.argv[1]
+        print(f"Usage: {sys.argv[0]} <stfs_package> [output_dir]")
+        print("  Extracts files from a LIVE/PIRS/CON Xbox 360 STFS package.")
+        sys.exit(1)
+
+    input_path = sys.argv[1]
 
     if len(sys.argv) < 3:
         output_dir = os.path.join(os.path.dirname(input_path) or '.', 'extracted')

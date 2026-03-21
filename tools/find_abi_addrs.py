@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Find Xbox 360 ABI register save/restore function addresses in the decompressed
-PE image extracted from a Vigilante 8 Arcade XEX file.
+Find Xbox 360 ABI register save/restore function addresses in a decompressed
+PE image extracted from an Xbox 360 XEX file.
 
 These are standard PowerPC ABI helper functions present in every Xbox 360 game:
   - __savegprlr_14 / __restgprlr_14
@@ -19,7 +19,7 @@ for GPR save/restore. Key observations:
   - The LR is saved/restored via stw/lwz r12 (32-bit)
   - Stack offsets: -(32-reg)*8 - 8 for GPR, -(32-reg)*8 for FPR
 
-Usage: py find_abi_addrs.py
+Usage: py find_abi_addrs.py <pe_image.bin> [--base 0x82000000]
 """
 
 import struct
@@ -28,14 +28,10 @@ import subprocess
 import sys
 
 # ============================================================================
-# Constants
+# Constants (defaults -- override via CLI)
 # ============================================================================
 
-BASE_ADDR = 0x82000000
-
-XEX_PATH = r"E:\vig8\extracted\default.xex"
-PE_PATH  = r"E:\vig8\tools\default_pe.bin"
-EXTRACT_EXE = r"E:\vig8\extract_pe.exe"
+DEFAULT_BASE_ADDR = 0x82000000
 
 
 # ============================================================================
@@ -514,25 +510,22 @@ def find_longjmp(data):
 # ============================================================================
 
 def main():
-    # Ensure PE is extracted
-    if not os.path.exists(PE_PATH):
-        print("PE binary not found at %s" % PE_PATH)
-        if os.path.exists(EXTRACT_EXE):
-            print("Extracting PE from XEX...")
-            result = subprocess.run(
-                [EXTRACT_EXE, XEX_PATH, PE_PATH],
-                capture_output=True, text=True
-            )
-            print(result.stdout)
-            if result.returncode != 0:
-                print("ERROR: %s" % result.stderr)
-                return
-        else:
-            print("ERROR: extract_pe.exe not found. Build it first.")
-            return
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='Find Xbox 360 ABI register save/restore function addresses in a PE image.')
+    parser.add_argument('pe_image', help='Path to the decompressed PE image (pe_image.bin)')
+    parser.add_argument('--base', type=lambda x: int(x, 0), default=DEFAULT_BASE_ADDR,
+                        help='Base address of the PE image (default: 0x82000000)')
+    args = parser.parse_args()
 
-    print("Loading PE image: %s" % PE_PATH)
-    with open(PE_PATH, 'rb') as f:
+    BASE_ADDR = args.base
+
+    if not os.path.exists(args.pe_image):
+        print("ERROR: PE binary not found at %s" % args.pe_image)
+        return
+
+    print("Loading PE image: %s" % args.pe_image)
+    with open(args.pe_image, 'rb') as f:
         pe_data = f.read()
 
     print("PE size: %d bytes (0x%X)" % (len(pe_data), len(pe_data)))

@@ -1,12 +1,12 @@
-// vig8 - Settings persistence
-// Loads/saves user configuration from vig8_settings.toml
+// mygame - Settings persistence
+// Loads/saves user configuration from mygame_settings.toml
 
 #pragma once
 
 #include <string>
 #include <filesystem>
 
-struct Vig8Settings {
+struct MyGameSettings {
     // [gfx]
     std::string render_path = "rov";  // "rov" or "rtv"
     int resolution_scale = 1;         // 1 or 2
@@ -37,15 +37,15 @@ struct Vig8Settings {
 };
 
 // Global debug flags (defined in stubs.cpp, set from ApplySettings)
-extern bool g_vig8_invulnerable;
-extern bool g_vig8_unlock_all_cars;
+extern bool g_game_cheat_1;
+extern bool g_game_cheat_2;
 
 // Per-slot sign-in state (defined in stubs.cpp, set from ApplySettings)
 // Player 1 is always connected; slots 1-3 controlled by settings.
-extern bool g_vig8_user_connected[4];
+extern bool g_game_user_connected[4];
 
 // Load settings from TOML file. Returns defaults if file doesn't exist or fails to parse.
-Vig8Settings LoadSettings(const std::filesystem::path& path);
+MyGameSettings LoadSettings(const std::filesystem::path& path);
 
 // Save settings to TOML file.
-void SaveSettings(const std::filesystem::path& path, const Vig8Settings& settings);
+void SaveSettings(const std::filesystem::path& path, const MyGameSettings& settings);
