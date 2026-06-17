@@ -1,0 +1,33 @@
+# manifest-overrides.example.toml
+#
+# How to hand-tune codegen by adding override tables to your generated
+# <name>_manifest.toml (created by `rexglue init`). The recomp harness applies
+# function hints automatically (see tools/harness/) -- you only do this by hand
+# when shipping a specific title or when auto-resolve can't converge.
+#
+# These tables go UNDER the [entrypoint] section (codegen reads them from the
+# entrypoint's recompiler config; see the SDK's src/codegen/config.cpp for the
+# authoritative key list). Add them after the generated keys:
+#
+#   [entrypoint]
+#   file_path = "../extracted/default.xex"
+#   out_directory_path = "generated/default"
+#   includes = []
+
+# --- Function boundary hints --------------------------------------------------
+# Fixes codegen's fatal `UnresolvedCall: 0xTARGET from 0xSITE: b 0xTARGET -
+# target not in any function`. Declare the target as a function entry; with no
+# size, discovery determines the extent (this is what the harness injects).
+# Use { end = 0x... } or { size = N } when you need to force a boundary, e.g. to
+# merge a function the analyzer split or to bound a run-away function.
+[entrypoint.functions]
+0x8207D730 = {}                      # entry-only hint: let discovery seal it
+# 0x821A03F8 = { end = 0x821A0500 }  # force an end (e.g. a mis-detected giant fn)
+# 0x82173508 = { size = 0x938 }      # force a size
+
+# --- Other override tables (see src/codegen/config.cpp for exact keys) --------
+# Codegen also accepts manual switch tables, invalid-instruction regions, and
+# midasm hooks via additional [entrypoint.*] tables. Most titles never need them
+# (auto-detection handles switch tables and data regions). Consult config.cpp in
+# your SDK checkout before using these -- key spellings can change between SDK
+# versions, so this file documents the pattern rather than guessing the schema.

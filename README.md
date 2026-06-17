@@ -1,215 +1,149 @@
 # 360tools
 
-**Everything you need to statically recompile Xbox 360 XBLA games to native PC executables.**
+**A toolkit and playbook for statically recompiling Xbox 360 games to native PC executables — built around the [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk).**
 
-No emulator. No interpreter. No JIT. Just your Xbox 360 game, recompiled to C++ and running natively on x86-64 at full speed.
+No emulator. No interpreter. No JIT. Your Xbox 360 game, recompiled to C++ and running natively on x86-64.
 
 ```
-   XBLA Game (PowerPC) ----or---- Xbox 360 ISO
-         |                              |
-    [ extract_stfs.py ]         [ extract_iso.py ]
-         |                              |
-    [ extract_pe.py ]        <-- decrypt & decompress the XEX2
-         |
-    [ find_abi_addrs.py ]    <-- locate PPC ABI helpers
-    [ extract_switch_tables.py ] <-- map out all jump tables
-    [ find_missing_vtable_funcs.py ] <-- catch vtable-only functions
-         |
-    [ XenonRecomp ]          <-- translate PowerPC -> C++
-         |
-    [ ReXGlue SDK ]          <-- provides the Xbox 360 runtime
-         |
-    Native x86-64 .exe       <-- your game, running on PC
+   XBLA / disc package
+          |
+   [ extract ]  default.xex + assets   (rexglue reads XEX/STFS directly,
+          |                              or use tools/ for triage)
+   [ rexglue init ]   ── scaffold project + manifest
+          |
+   [ rexglue codegen ] ── PowerPC → C++   (auto-resolve hints via tools/harness)
+          |
+   [ + stubs / hooks ] ── fill gaps the runtime doesn't cover (templates/)
+          |
+   [ cmake build ]    ── link against the ReXGlue runtime
+          |
+   Native x86-64 .exe
 ```
 
-## What's In The Box
+## Heads-up: this is the v0.8.0 era
 
-### `tools/` -- The Pipeline
+ReXGlue **v0.8.0** is a self-contained recompiler. It ships its own codegen
+(`rexglue codegen`), its own XEX/STFS/LZX/AES extraction, jump-table / RTTI-vtable
+/ ABI-helper detection, and a manifest-driven project model. **XenonRecomp is no
+longer required** — the older pipeline that fed it now lives in [`legacy/`](legacy/).
+What's left for you is the genuinely hard part: runtime integration (stubs,
+per-title quirks, rendering/audio), which is what this repo now focuses on.
 
-| Script | What It Does |
+## What's in the box
+
+### `tools/harness/` — the generalizing engine *(start here for breadth)*
+
+`recomp_harness.py` batch-runs the whole loop across a library of titles and
+aggregates a **compatibility matrix** + a **failure-mode catalog**: codegen
+success rate, the cross-title kernel-import frequency table (your stub-priority
+list), high-base titles, analysis-error and giant-function catalogs, and (opt-in)
+build/boot results. Tiered and resumable; triage (extract→codegen) scales to a
+whole library cheaply. It even **auto-resolves** codegen's `UnresolvedCall` errors
+by injecting function hints and retrying. See [`tools/harness/README.md`](tools/harness/README.md).
+
+### `tools/` — triage & fallback helpers
+
+Standalone Python tools, handy when you want to inspect a binary without building
+the SDK. ReXGlue now does most of this internally, so these are **triage/fallback**,
+not the main path (and a couple have known limits — noted below).
+
+| Script | What it does |
 |--------|-------------|
-| **`extract_stfs.py`** | Rips files out of STFS/LIVE/PIRS/CON Xbox 360 packages. Point it at a downloaded XBLA title and it pulls out the XEX and all game assets. Handles edge cases like `start_block=0` entries. |
-| **`extract_iso.py`** | Extracts game files from Xbox 360 XDVDFS disc images. Finds the partition automatically (XGD1/XGD2), parses the B-tree directory, and extracts all files. Detects encrypted ISOs and points you to extract-xiso. |
-| **`extract_pe.py`** | Decrypts (AES-128) and decompresses the PE image buried inside an XEX2 file. Handles both basic block and LZX (Normal) compression, plus raw COFF headers without MZ/PE signatures. This is what XenonRecomp actually needs. |
-| **`lzx_decompress.py`** | Pure Python LZX decompression. Used by `extract_pe.py` for XEX files with LZX-compressed PE images. |
-| **`find_abi_addrs.py`** | Scans the PE binary for all 10 standard PowerPC ABI helper functions (`__savegprlr_14`, `__restfpr_14`, VMX save/restore, `setjmp`/`longjmp`, etc.) and outputs them in TOML format ready for XenonRecomp. |
-| **`extract_switch_tables.py`** | Finds PPC switch/jump tables by pattern-matching `add r12,r12,r0; mtctr r12; bctr` sequences, reads the table data, and generates `[[switch]]` TOML entries. Handles u8/u16 entries, scaling, bounds checking. |
-| **`find_missing_vtable_funcs.py`** | Scans the PE data section for C++ vtable entries pointing to functions that XenonRecomp missed (because they're never called directly -- only through vtable dispatch). Classifies entries as THUNK or FUNC. |
-| **`parse_xex_imports.py`** | Parses XEX2 import tables to identify which kernel/XAM functions the game actually calls. Helps you know which stubs you need to implement. |
-| **`xex_info.py`** | Quick XEX2 header dumper -- parses and displays all header fields, security info, import libraries, static libraries, and a recompilation summary. Great for initial triage before running the full pipeline. |
-| **`extract_xex_direct.py`** | Brute-force XEX2 extractor that finds XEX2 magic in STFS containers and rebuilds the contiguous data stream (stripping hash table blocks). Useful fallback when `extract_stfs.py`'s block algorithm fails on unusual packages. |
-| **`post_codegen.py`** | Re-applies safety macro overrides (`PPC_CALL_INDIRECT_FUNC`, `PPC_UNIMPLEMENTED`) to the generated `*_init.h` after codegen regenerates it. Run after every `rexglue codegen` pass. |
-| **`dump_pe.cpp`** | C++ XEX-to-PE extractor using XenonUtils. Faster than the Python version if you've already built XenonRecomp. |
+| `extract_stfs.py` | Rip files out of STFS/LIVE/PIRS/CON packages (handles the `start_block=0` edge case). |
+| `extract_iso.py` | Extract Xbox 360 XDVDFS disc images (XGD1/XGD2). |
+| `xex_info.py` | Quick XEX2 header dump — base address, image size, entry, imports. Best triage tool. |
+| `extract_pe.py` | XEX2 AES-decrypt + LZX-decompress to a raw PE. *Known limit: fails on some compression variants — use rexglue, which decompresses internally.* |
+| `parse_xex_imports.py` | XEX import-table parser. *Known limit: unreliable ordinals — for an authoritative import list use the harness (harvests from ReXGlue's own output).* |
+| `find_abi_addrs.py`, `extract_switch_tables.py`, `find_missing_vtable_funcs.py` | ABI-helper / jump-table / vtable scanners. **Superseded** by ReXGlue's built-in analysis; kept for reference. |
 
-### `patches/` -- XenonRecomp Fixes
+### `templates/` — v0.8.0 project overlay
 
-The stock XenonRecomp doesn't handle every instruction you'll hit in the wild. These patches add what's missing:
+`rexglue init` scaffolds the project; this overlay adds what it doesn't: a
+drop-in `stubs.cpp`, an annotated `ReXApp` hook reference, manifest-override
+examples, and the [`STUBS.md`](templates/STUBS.md) playbook. See
+[`templates/README.md`](templates/README.md).
 
-| Patch | What It Adds |
-|-------|-------------|
-| **`xenonrecomp-altivec-vmx.patch`** | 30+ missing Altivec/VMX instruction handlers: `vaddsbs`, `vaddsws`, `vavguh`, `vcmpequh`, `vcmpgtsh`, `vpkshss`, `vpkswus`, `vrlh`, `vslh`, `vslo`, `vnor`, `vspltish`, `vsrab`, `vsrah`, and more. Also adds `cror`, `crorc`, `eqv`, `rldicl` with Rc bit. |
-| **`xenonrecomp-missing-instructions.patch`** | 21 missing PPC instructions: update-form loads (`lhzu`, `lhau`, `lbzux`, `lhzux`, `lwzux`, `ldux`, `lfsu`, `lfsux`, `lfdu`), update-form stores (`sthu`, `sthux`, `stbux`, `stdux`, `stfsu`, `stfdu`), conditional branches (`bdzf`, `bdnzt`), integer arithmetic (`addc`, `addme`, `subfze`), and `lvehx`. |
+### `docs/`, `config/`, `legacy/`
 
-### `templates/` -- Project Scaffold
+Workflow & analysis notes; example configs; and the archived XenonRecomp-era kit
+(see [`legacy/README.md`](legacy/README.md)).
 
-A complete, working project template based on the patterns proven across multiple shipped recomp projects. Copy this into your new project and customize:
-
-```
-templates/
-  ppc_config.h              # __builtin_trap() override, PPC_CALL_INDIRECT_FUNC
-                             #   with import thunk resolution, PPC_INCLUDE_DETAIL gate
-  project/
-    CMakeLists.txt           # ReXGlue SDK build with WHOLEARCHIVE linking
-    CMakePresets.json         # Clang + Ninja preset (win-amd64)
-    src/
-      main.cpp               # Windowed app: VEH crash handler, null page handler,
-                              #   guest page demand paging, C++ exception decoding,
-                              #   F11 fullscreen, ImGui overlay, stderr logging
-      menu.cpp / menu.h      # Win32 native menu bar + ImGui config dialogs
-                              #   (Graphics, Game, Debug, Controls)
-      settings.cpp / settings.h  # TOML-based settings persistence via toml++
-      stubs.cpp              # Game-specific kernel stub overrides
-                              #   (license bypass, multi-user sign-in, etc.)
-      keyboard_driver.cpp/h  # Keyboard + XInput merged input driver
-                              #   (both keyboard and real controller work simultaneously)
-      test_boot.cpp          # Console-mode test harness for isolating crashes
-```
-
-### `docs/` -- How It All Works
-
-| Doc | What It Covers |
-|-----|---------------|
-| **`xenonrecomp-workflow.md`** | Full step-by-step from "I have an XBLA download" to "I have a running PC executable". Building XenonRecomp, applying patches, running codegen, integrating with ReXGlue. |
-| **`speed-fix.md`** | The two speed fixes every 360 recomp needs: VdSwap frame limiter (Windows `Sleep(16)` actually sleeps 31ms!) and `__rdtsc()` timebase scaling (host TSC is 60-80x faster than Xbox 360's 49.875 MHz timebase). |
-| **`binary-analysis.md`** | How to analyze an Xbox 360 PE binary: memory layout, section mapping, finding entry points, understanding the PPC ABI. |
-
-### `config/` -- Example Configs
-
-Reference TOML configurations for XenonRecomp and ReXGlue codegen, with comments explaining every field.
-
-## Quick Start
-
-### Prerequisites
-
-- **Python 3.8+** with dependencies: `pip install -r requirements.txt`
-- **CMake 3.20+**, **Ninja**, **Clang 18+** (clang-cl on Windows)
-- **MSVC 2022** (for Windows SDK headers)
-- **Git** (for cloning XenonRecomp and ReXGlue)
-
-### The Pipeline
+## Quick start
 
 ```bash
-# 1. Get your game files out of the XBLA package (or ISO)
-python tools/extract_stfs.py path/to/XBLA_PACKAGE output_dir/
-# -- or for disc-based games --
-python tools/extract_iso.py path/to/game.iso output_dir/
+# Prereqs: Python 3.8+, CMake 3.25+, Ninja, Clang 20+, VS2022 (Windows SDK + D3D12),
+#          and a built ReXGlue SDK (see its repo). git clone --recursive the SDK;
+#          on Windows, materialize libmspack's symlinked sources before building.
 
-# 2. Decrypt and decompress the XEX into a raw PE image
-python tools/extract_pe.py output_dir/default.xex pe_image.bin
+# 1. Extract (or point rexglue straight at the package)
+python tools/extract_stfs.py path/to/PACKAGE extracted/
 
-# 3. Find ABI helper addresses (paste output into your TOML config)
-python tools/find_abi_addrs.py pe_image.bin
+# 2. Scaffold + recompile
+rexglue init --project-name mygame --xex-path extracted/default.xex \
+             --game-root extracted --project-root mygame
+cd mygame && rexglue codegen        # add [entrypoint.functions] hints if it complains
 
-# 4. Build XenonRecomp with our patches
-git clone --recursive https://github.com/hedge-dev/XenonRecomp.git
-cd XenonRecomp
-git apply ../patches/xenonrecomp-altivec-vmx.patch
-git apply ../patches/xenonrecomp-missing-instructions.patch
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
-cmake --build build --config Release
-cd ..
+# 3. Build (link errors -> add missing stubs from templates/overlay/src/stubs.cpp)
+cmake --preset win-amd64-release && cmake --build out/build/win-amd64-release
 
-# 5. Create your TOML config (see config/example.toml)
-#    Add the ABI addresses from step 3
-#    Run XenonRecomp:
-./XenonRecomp/build/XenonRecomp pe_image.bin your_game.toml
-
-# 6. Extract switch tables and add them to config
-python tools/extract_switch_tables.py pe_image.bin
-#    Append the output to your TOML config, re-run XenonRecomp
-
-# 7. Find vtable functions that were missed
-python tools/find_missing_vtable_funcs.py pe_image.bin generated/your_game_init.cpp
-#    Add missing functions to your config, re-run XenonRecomp
-
-# 8. Set up your project from the template
-cp -r templates/project your_game/project
-#    Customize CMakeLists.txt, main.cpp, stubs.cpp for your game
-#    Clone ReXGlue SDK, build, and run!
+# 4. Run
+./out/build/win-amd64-release/mygame.exe --game_data_root=../extracted
 ```
 
-### Parse XEX Imports (Optional but Helpful)
+To survey many titles at once instead:
 
 ```bash
-# See which kernel/XAM functions your game actually calls
-python tools/parse_xex_imports.py path/to/default.xex
+python tools/harness/recomp_harness.py run --library XBLA --max-tier 2
+# -> per-title results + REPORT.md (funnel, import table, error catalog, ...)
 ```
 
-This tells you exactly which Xbox 360 API stubs you'll need to implement (or which ones the ReXGlue SDK already covers).
+## Runtime knowledge
 
-## Battle-Tested Fixes
+The v0.8.0 SDK now provides what used to be hand-rolled in every project: the
+window + D3D12/Vulkan presentation and frame loop, the ImGui debug overlay /
+console / settings dialogs, SDL3 input (keyboard+gamepad), crash/VEH handling,
+guest function dispatch, and frame pacing + guest timebase. So the old
+"battle-tested fixes" for those are now **SDK-internal** — you mostly write:
 
-These patterns have been discovered, debugged, and proven across multiple projects. They're already baked into the templates:
+- **Kernel stubs** for APIs the runtime doesn't export — see [`templates/STUBS.md`](templates/STUBS.md).
+- **`ReXApp` hook overrides** for per-title quirks (GPU config in `OnPreSetup`,
+  data patches in `OnPostLoadXexImage`/`OnPreLaunchModule`, paths in
+  `OnConfigurePaths`) — see `templates/overlay/src/game_app.reference.h`.
+- **Manifest hints** when codegen can't resolve a boundary.
 
-### VdSwap Frame Limiter
-Windows `Sleep(16)` actually sleeps ~31ms due to 15.6ms timer granularity. The fix uses `QueryPerformanceCounter` spin-loop for precise 16.667ms frame pacing. Without this, your game runs at half speed. See `docs/speed-fix.md`.
+## The Stack
 
-### Timebase Scaling
-XenonRecomp generates `__rdtsc()` for PPC `mftb` instructions, but your PC's TSC runs at ~3-4 GHz vs the Xbox 360's 49.875 MHz. The `ppc_config.h` template overrides `__rdtsc()` to route through the ReXGlue SDK's scaled guest timebase.
+- **[ReXGlue SDK](https://github.com/rexglue/rexglue-sdk)** — the recompiler + runtime (codegen, XboxKrnl/XAM/XBDM kernel, D3D12 **and** Vulkan GPU backends derived from [Xenia](https://github.com/xenia-project/xenia), XMA audio via FFmpeg, SDL3 input). v0.8.0+. Build with **Clang 20+**, **CMake 3.25+**, Ninja.
+- **[Xenia](https://github.com/xenia-project/xenia)** — the emulator whose GPU code underpins ReXGlue's backends.
+- **SDL3**, **Dear ImGui**, **toml++**, **FFmpeg**, **SIMDE** — runtime/codegen dependencies (vendored by the SDK).
 
-### PPC_CALL_INDIRECT_FUNC Safe Dispatch
-C++ vtable calls on Xbox 360 need NULL checks, code range validation, import thunk resolution, and graceful fallback instead of hard crashes. The `ppc_config.h` template includes the battle-hardened macro that handles all three cases: NULL targets, import thunks (decodes the PPC `lis/lwz/mtctr/bctr` pattern and resolves through the IAT), and normal code-range targets.
-
-### __builtin_trap() Override
-XenonRecomp emits `__builtin_trap()` as safety nets for out-of-range switch/jump table indices, but some paths are legitimately reached at runtime. The template overrides this to log a rate-limited warning instead of crashing.
-
-### VEH Null Page Handler + Guest Page Demand Paging
-Three Vectored Exception Handlers work together: a crash logger (with C++ exception decoding via MSVC's `0xE06D7363` magic), a guest page commit handler (demand-pages 4KB within the guest address range), and a null page handler that intercepts null pointer dereferences, decodes the x86-64 instruction (MOV, MOVZX, MOVSX, MOVSXD, MOV8), zeros the destination register, and continues execution.
-
-### ROV vs RTV Render Path
-If you're getting white screens with certain render target formats (especially `k_2_10_10_10_FLOAT` + 4xMSAA), switch to the ROV (Rasterizer Ordered Views) path. ROV uses pixel shader interlock for EDRAM emulation and handles these edge cases correctly.
+> Note: we build against and fork the ReXGlue SDK as needed, but we do **not** push changes upstream.
 
 ## Projects Built With These Tools
 
 | Game | Repo | Status |
 |------|------|--------|
-| **The Simpsons Arcade** (XBLA, 2012) | [simpsonsarcade](https://github.com/sp00nznet/simpsonsarcade) | Playable -- full speed, audio, input, graphics |
-| **Vigilante 8 Arcade** (XBLA) | [vig8](https://github.com/sp00nznet/vig8) | Playable -- 90 FPS, split-screen multiplayer, 79 shaders |
-| **Guitar Hero II** (Xbox 360, 2007) | [gh2](https://github.com/sp00nznet/gh2) | Playable -- gameplay, audio, scoring, keyboard input working. Guitar controller support in progress |
-| **Crazy Taxi** (XBLA, 2010) | [ctxbla](https://github.com/sp00nznet/ctxbla) | Playable -- D3D12 rendering, keyboard + XInput, arcade mode. In-game audio (XMA) in progress |
-| **Comix Zone** (XBLA, 2009) | [comixzone](https://github.com/sp00nznet/comixzone) | Analysis -- binary extracted, 11,824 functions generated, runtime scaffold pending |
-| **Virtual On: Oratorio Tangram** (XBLA) | [voot](https://github.com/sp00nznet/voot) | Foundation -- project structure, codegen config ready |
-| **Saints Row** (Xbox 360, 2006) | [saintsrow](https://github.com/sp00nznet/saintsrow) | Planning -- ISO extracted, binary analysis pending |
+| The Simpsons Arcade (XBLA) | [simpsonsarcade](https://github.com/sp00nznet/simpsonsarcade) | Playable |
+| Vigilante 8 Arcade (XBLA) | [vig8](https://github.com/sp00nznet/vig8) | Playable |
+| Guitar Hero II (360) | [gh2](https://github.com/sp00nznet/gh2) | Playable (controller WIP) |
+| Crazy Taxi (XBLA) | [ctxbla](https://github.com/sp00nznet/ctxbla) | Playable (XMA WIP) |
+| Comix Zone (XBLA) | [comixzone](https://github.com/sp00nznet/comixzone) | Analysis |
+| Virtual On (XBLA) | [voot](https://github.com/sp00nznet/voot) | Foundation |
+| Saints Row (360) | [saintsrow](https://github.com/sp00nznet/saintsrow) | Planning |
 
-## The Stack
-
-This whole pipeline stands on the shoulders of some incredible projects:
-
-- **[XenonRecomp](https://github.com/hedge-dev/XenonRecomp)** by hedge-dev -- The static recompiler that translates PowerPC to C++. This is the engine that makes it all possible.
-- **[ReXGlue SDK](https://github.com/hedge-dev/ReXGlue)** by hedge-dev -- The runtime that provides everything the Xbox 360 OS gave games: kernel, D3D12 GPU backend (derived from [Xenia](https://github.com/xenia-project/xenia)'s GPU code), XMA audio, input, threading.
-- **[Xenia](https://github.com/xenia-project/xenia)** -- The Xbox 360 emulator whose GPU implementation powers the D3D12 backend in ReXGlue.
-- **[SIMDE](https://github.com/simd-everywhere/simde)** -- SIMD Everywhere, used by XenonRecomp to translate Altivec/VMX vector instructions to SSE/AVX.
-- **[toml++](https://github.com/marzer/tomlplusplus)** -- TOML config parsing for the settings system.
-- **[Dear ImGui](https://github.com/ocornut/imgui)** -- The in-game overlay UI for settings, debug info, and controller config.
+> These shipped on an earlier ReXGlue (v0.1.x). The current loop and the runtime
+> APIs differ — see [`legacy/`](legacy/) for the older patterns.
 
 ## Want to Recomp a Game?
 
-Pick an XBLA title. Seriously, just pick one. The delisted ones especially -- those games deserve to be preserved and playable. Here's what to look for in a good first target:
-
-- **Simpler is better** -- Arcade ports, 2D games, and smaller 3D titles are easier than massive open-world games
-- **Single-player or local multiplayer** -- No Xbox Live dependency to stub out
-- **Well-known titles** -- More people will care, more people will help test
-- **Delisted games** -- These are the most important to preserve. If you can't buy it anymore, recomp is the only way to play it
-
-The tools in this repo will get you from "I have an XBLA download" to "I have generated C++ code" in about 30 minutes. The real work is in the runtime -- implementing the game-specific stubs, fixing rendering quirks, and getting audio/input working. But ReXGlue handles most of the heavy lifting.
-
-**Every game you recomp is a game preserved forever.** No more worrying about delisted stores, dead hardware, or emulator compatibility. The game IS the executable.
-
-Let's go.
+Pick an XBLA title — the delisted ones especially. Simpler is better (arcade
+ports, 2D, smaller 3D); single-player or local-multiplayer avoids Xbox Live
+stubbing; well-known titles get more testers. Extraction and codegen are minutes
+of work now; the runtime is the craft. **Every game you recomp is a game
+preserved forever.**
 
 ## License
 
-Tools and scripts in this repo are provided under the MIT License unless otherwise noted in individual files. `extract_stfs.py` contains code derived from work by Rene Ladan under the 2-clause BSD license.
-
-XenonRecomp, ReXGlue, and other dependencies have their own licenses -- check their respective repositories.
+MIT unless noted otherwise per file. `extract_stfs.py` includes code derived from
+work by Rene Ladan (2-clause BSD). ReXGlue and other dependencies carry their own
+licenses.

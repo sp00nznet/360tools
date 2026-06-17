@@ -147,7 +147,10 @@ def read_xex_info(xex_path):
                 for li in range(min(num_libs, 20)):
                     lib_off = header_data + 4 + li * 16
                     if lib_off + 16 <= len(data):
-                        lib_name = data[lib_off:lib_off + 8].decode('ascii', errors='replace').rstrip('\x00')
+                        # Keep only printable ASCII so the name is safe to print
+                        # on any console codepage (cp1252 chokes on U+FFFD).
+                        raw = data[lib_off:lib_off + 8]
+                        lib_name = ''.join(chr(b) for b in raw if 32 <= b < 127).rstrip('\x00')
                         lib_major = struct.unpack_from('>H', data, lib_off + 8)[0]
                         lib_minor = struct.unpack_from('>H', data, lib_off + 10)[0]
                         lib_build = struct.unpack_from('>H', data, lib_off + 12)[0]

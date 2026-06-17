@@ -1,5 +1,10 @@
 # The Simpsons Arcade - Binary Analysis Notes
 
+> **v0.8.0 note:** ReXGlue's codegen now does container/XEX parsing and function/
+> jump-table/vtable analysis for you. This remains a useful worked example of how
+> an Xbox 360 binary is laid out (STFS → XEX → PE, memory map, the PPC ABI) when
+> you need to reason about a title by hand.
+
 ## STFS Container
 
 The game is distributed as a LIVE (STFS) container:

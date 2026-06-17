@@ -1,5 +1,9 @@
 # Speed Fix: VdSwap Frame Limiter + Timebase Scaling
 
+> **v0.8.0 note:** ReXGlue now handles frame pacing and the guest timebase inside
+> the runtime — you no longer hand-roll these in the project. Kept as background
+> on *why* they matter and what to check if a recompile runs at the wrong speed.
+
 ## Problem
 The game ran at half speed (~30 FPS game logic) despite reporting ~70 FPS in the overlay.
 
