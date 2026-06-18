@@ -108,6 +108,11 @@ def extract_live_pirs(input_path, output_dir):
             # Bytes 60-63: access date (BE32)
 
             outname = cur[0:name_len].decode('ascii', errors='replace')
+            # Sanitize for the host filesystem: some STFS entries carry corrupt
+            # or binary names that are illegal on Windows (and crash open()).
+            _BAD = '<>:"/\\|?*'
+            outname = ''.join('_' if (c in _BAD or ord(c) < 0x20 or c == '�') else c
+                              for c in outname).rstrip(' .') or '_unnamed'
 
             clustsize1 = struct.unpack("<H", cur[41:43])[0] + (cur[43] << 16)
             clustsize2 = struct.unpack("<H", cur[44:46])[0] + (cur[46] << 16)

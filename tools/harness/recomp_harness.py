@@ -110,7 +110,23 @@ def stage_extract(rar: Path, work: Path, cfg) -> dict:
     if not files:
         r["error"] = "no files in archive"
         return r
-    stfs = max(files, key=lambda p: p.stat().st_size)   # STFS CON package = largest file
+
+    # Pick the STFS container by magic (LIVE/PIRS/CON), largest first -- not just
+    # the largest file (some archives have a bigger non-STFS blob alongside it).
+    def _is_stfs(p):
+        try:
+            with open(p, "rb") as fh:
+                return fh.read(4) in (b"LIVE", b"PIRS", b"CON ")
+        except OSError:
+            return False
+    stfs_files = sorted((p for p in files if _is_stfs(p)),
+                        key=lambda p: p.stat().st_size, reverse=True)
+    if not stfs_files:
+        r["status"] = "no_stfs"
+        r["error"] = "no STFS (LIVE/PIRS/CON) container in archive (GOD/ISO/other format?)"
+        shutil.rmtree(raw, ignore_errors=True)
+        return r
+    stfs = stfs_files[0]
     r["stfs_file"] = stfs.name
     r["stfs_mb"] = round(stfs.stat().st_size / 1048576, 1)
 
@@ -127,7 +143,10 @@ def stage_extract(rar: Path, work: Path, cfg) -> dict:
     if not xexes:
         xexes = [p for p in stfs_out.rglob("*.xex")] + [p for p in stfs_out.rglob("*.XEX")]
     if not xexes:
-        r["error"] = "no .xex found in package"
+        # Common for episodic/DLC packages (Telltale, Minecraft Story Mode, ...)
+        # that ship content but no standalone executable -- not a recomp target.
+        r["status"] = "no_xex"
+        r["error"] = "no standalone XEX in package (episodic/DLC content?)"
         shutil.rmtree(raw, ignore_errors=True)
         return r
 
@@ -307,9 +326,14 @@ def stage_build(work: Path, cfg) -> dict:
     rc, out, err, dur = run(["powershell", "-NoProfile", "-Command", ps], timeout=cfg.t_build)
     blob = out + "\n" + err
     r["build_s"] = round(dur, 1)
-    undef = re.findall(r"undefined symbol: [^\n]*?_(\w+)", blob)
+    # "undefined symbol: __declspec(dllimport) _XUsbcamCreate" -> XUsbcamCreate
+    undef = re.findall(r"undefined symbol:\s*(?:__declspec\(dllimport\)\s*)?_?(\w+)", blob)
     if undef:
-        r["undefined_symbols"] = sorted(set(undef))[:30]
+        r["undefined_symbols"] = sorted(set(undef))[:50]
+    # capture error lines for diagnosing non-link build failures (compile errors, etc.)
+    err_lines = [ln.strip() for ln in blob.splitlines() if re.search(r"\berror\b|FAILED", ln, re.I)]
+    if err_lines:
+        r["error_tail"] = err_lines[-8:]
     exe = next((proj / "out" / "build" / "win-amd64-release").glob("*.exe"), None) \
         if (proj / "out" / "build" / "win-amd64-release").exists() else None
     if rc == 0 and exe and exe.exists():
@@ -318,6 +342,10 @@ def stage_build(work: Path, cfg) -> dict:
         r["exe_mb"] = round(exe.stat().st_size / 1048576, 2)
     else:
         r["error"] = f"build rc={rc}" + ("; undefined symbols" if undef else "")
+    # Disk hygiene: a build tree is GB-scale. Drop it once we've captured the
+    # result, unless we still need the exe for the boot stage.
+    if cfg.max_tier < 4:
+        shutil.rmtree(proj / "out" / "build", ignore_errors=True)
     return r
 
 
@@ -448,7 +476,7 @@ def cmd_report(cfg):
 
     import_counter = Counter()       # how many titles import each function (from codegen init.h)
     err_types = Counter()
-    high_base, giants, extract_fail, codegen_fail, build_undef = [], [], [], [], Counter()
+    high_base, giants, extract_fail, not_target, codegen_fail, build_undef = [], [], [], [], [], Counter()
     base_dist = Counter()
     hint_stats = []                  # (title, hints_added, iterations) for codegen-passed titles
     for r in rows:
@@ -458,7 +486,10 @@ def cmd_report(cfg):
             base_dist[prof.get("base", "?")] += 1
             if prof.get("high_base"):
                 high_base.append((r["title"], prof.get("base")))
-        if st.get("extract", {}).get("status") != "ok" and "extract" in st:
+        ex_status = st.get("extract", {}).get("status")
+        if ex_status in ("no_xex", "no_stfs"):
+            not_target.append((r["title"], st["extract"].get("error", "?")))
+        elif ex_status != "ok" and "extract" in st:
             extract_fail.append((r["title"], st["extract"].get("error", "?")))
         cg = st.get("codegen", {})
         for e in cg.get("analysis_errors", []) or []:
@@ -545,6 +576,14 @@ def cmd_report(cfg):
             A(f"- {t}: {e}")
         A("")
 
+    if not_target:
+        A(f"## Not a recomp target ({len(not_target)})\n")
+        A("_No standalone XEX / no STFS container — episodic or DLC content, not a"
+          " title to recompile. Excluded from the failure count._\n")
+        for t, e in not_target[:40]:
+            A(f"- {t}: {e}")
+        A("")
+
     # boot furthest-stage histogram
     boot_far = Counter(r["stages"].get("boot", {}).get("furthest")
                        for r in rows if r["stages"].get("boot", {}).get("status") == "ok")
@@ -597,8 +636,8 @@ def main():
     pr.add_argument("--max-codegen-iters", dest="max_codegen_iters", type=int, default=8,
                     help="auto-resolve retry passes (inject function hints, re-run codegen)")
     pr.add_argument("--t-extract", dest="t_extract", type=int, default=600)
-    pr.add_argument("--t-codegen", dest="t_codegen", type=int, default=300)
-    pr.add_argument("--t-build", dest="t_build", type=int, default=2400)
+    pr.add_argument("--t-codegen", dest="t_codegen", type=int, default=600)
+    pr.add_argument("--t-build", dest="t_build", type=int, default=3600)
 
     rp = sub.add_parser("report", help="aggregate results into REPORT.md")
     rp.add_argument("--out")
@@ -609,7 +648,7 @@ def main():
     for f, d in [("keep_xex", False), ("keep_generated", False), ("keep_assets", False),
                  ("boot_seconds", 15), ("max_tier", 2), ("force", False), ("titles", None),
                  ("limit", None), ("library", "XBLA"), ("t_extract", 600),
-                 ("t_codegen", 300), ("t_build", 2400), ("max_codegen_iters", 8)]:
+                 ("t_codegen", 600), ("t_build", 3600), ("max_codegen_iters", 8)]:
         if not hasattr(args, f):
             setattr(args, f, d)
     cfg = build_cfg(args)

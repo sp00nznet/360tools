@@ -27,10 +27,13 @@
 // ---------------------------------------------------------------------------
 // EXAMPLE (verified): XUsbcam (Xbox 360 Vision Camera).
 //
-// The SDK implements these in src/kernel/xboxkrnl/xboxkrnl_usbcam.cpp but it is
-// commented out of the runtime build, so the symbols aren't exported. Many XBLA
-// titles import the camera API and never use it -- Create must return success
-// (some titles abort init on failure), the rest can be no-ops.
+// This is THE default stub bundle: a harness sweep of the XBLA library found
+// XUsbcam* imported by ~26% of titles (184/700) yet missing from rexruntime --
+// it's by far the most common link blocker. The SDK implements it in
+// src/kernel/xboxkrnl/xboxkrnl_usbcam.cpp but leaves it commented out of the
+// runtime build, so the symbols aren't exported. Most titles pull it in via a
+// shared MS XDK library and never use the camera -- Create must return success
+// (some titles abort init on failure), the rest can be no-ops. Keep this block.
 //
 // DELETE this block if your title doesn't import XUsbcam* (the linker will tell
 // you which symbols it actually needs).
