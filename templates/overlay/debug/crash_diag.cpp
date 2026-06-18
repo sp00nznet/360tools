@@ -40,6 +40,12 @@ void symline(FILE* f, HANDLE proc, DWORD64 addr, int idx) {
             (unsigned long long)disp, (unsigned long long)addr);
   else
     fprintf(f, "  [%2d] %s!0x%llX\n", idx, modname, (unsigned long long)addr);
+  // Source file:line (RelWithDebInfo) -- maps straight to the generated sub_XXXX cpp.
+  IMAGEHLP_LINE64 line;
+  line.SizeOfStruct = sizeof(line);
+  DWORD line_disp = 0;
+  if (SymGetLineFromAddr64(proc, addr, &line_disp, &line))
+    fprintf(f, "         %s:%lu\n", line.FileName, line.LineNumber);
 }
 
 LONG CALLBACK Veh(EXCEPTION_POINTERS* ep) {
