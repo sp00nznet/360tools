@@ -65,7 +65,8 @@ examples, and the [`STUBS.md`](templates/STUBS.md) playbook. See
 
 ### `docs/`, `config/`, `legacy/`
 
-Workflow & analysis notes (incl. [`docs/rexglue-workflow.md`](docs/rexglue-workflow.md)
+Workflow & analysis notes (incl. [`docs/rexglue-workflow.md`](docs/rexglue-workflow.md),
+[`docs/runtime-debugging.md`](docs/runtime-debugging.md) for "boots but crashes",
 and the library-wide [`docs/xbla-triage-findings.md`](docs/xbla-triage-findings.md));
 example configs; and the archived XenonRecomp-era kit
 (see [`legacy/README.md`](legacy/README.md)).

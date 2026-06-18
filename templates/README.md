@@ -11,6 +11,8 @@ the small set of things you add *on top of* `rexglue init`, plus the playbook.
 |---|---|
 | `overlay/src/stubs.cpp` | Drop-in project stubs for kernel/XAM APIs the runtime doesn't export. Ships a verified `XUsbcam` stub set; add your title's missing symbols here. Add to your CMake sources. |
 | `overlay/src/overrides.example.cpp` | Verified port of overriding APIs the SDK **already** implements — multi-user sign-in (kernel override via `REX_HOOK` + `/force:multiple`) and the generated-`sub_` game-logic/license patch. |
+| `overlay/src/dispatch_tolerance.cpp` | Tolerate calls to null/invalid/unregistered guest functions (restores the old `PPC_CALL_INDIRECT_FUNC` behavior; v0.8.0 fatals by default). Add + `/force:multiple`. |
+| `overlay/debug/crash_diag.cpp` | Debug aid: symbolized access-violation logger for "boots but crashes" titles. See [`docs/runtime-debugging.md`](../docs/runtime-debugging.md). |
 | `overlay/src/game_app.reference.h` | Annotated `rex::ReXApp` subclass — the virtual hooks, what each is for, and which old battle-tested fix each replaces. Copy hooks into your generated `<name>_app.h`. |
 | `overlay/manifest-overrides.example.toml` | How to add `[entrypoint.functions]` hints (and friends) to your manifest when codegen needs them. |
 | `STUBS.md` | The kernel stub & override playbook (missing-API vs override-existing vs codegen hint). |
