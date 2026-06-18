@@ -256,6 +256,13 @@ def stage_codegen(work: Path, cfg) -> dict:
         new = {t for t in targets if t not in hints}
         if not new or not manifest:
             break              # no progress possible (non-hintable error) -> give up
+        # Divergence guard: some titles never converge -- each round of hints
+        # spawns hundreds of NEW unresolved calls (a structural codegen/analysis
+        # issue, not something more hints fix). Bail instead of burning iterations.
+        if len(new) > cfg.diverge_round or len(hints) + len(new) > cfg.max_hints:
+            r["diverged"] = True
+            hints |= new
+            break
         hints |= new
         _write_function_hints(base_manifest, manifest, hints)
 
@@ -284,6 +291,8 @@ def stage_codegen(work: Path, cfg) -> dict:
     if r.get("status") == "ok":
         r["imports"] = _harvest_imports(gen)     # authoritative, from ReXGlue's init.h
         r["n_imports"] = len(r["imports"])
+    elif r.get("diverged"):
+        r["error"] = f"codegen divergent ({len(hints)} hints, not converging)"
     else:
         r["error"] = f"codegen rc={rc}" + (f"; {errs[0]['type']}" if errs else "")
 
@@ -635,6 +644,10 @@ def main():
     pr.add_argument("--boot-seconds", dest="boot_seconds", type=int, default=15)
     pr.add_argument("--max-codegen-iters", dest="max_codegen_iters", type=int, default=8,
                     help="auto-resolve retry passes (inject function hints, re-run codegen)")
+    pr.add_argument("--max-hints", dest="max_hints", type=int, default=250,
+                    help="give up auto-resolve once total injected hints exceed this (divergence)")
+    pr.add_argument("--diverge-round", dest="diverge_round", type=int, default=100,
+                    help="give up if a single round adds more than this many new hints")
     pr.add_argument("--t-extract", dest="t_extract", type=int, default=600)
     pr.add_argument("--t-codegen", dest="t_codegen", type=int, default=600)
     pr.add_argument("--t-build", dest="t_build", type=int, default=3600)
@@ -648,7 +661,8 @@ def main():
     for f, d in [("keep_xex", False), ("keep_generated", False), ("keep_assets", False),
                  ("boot_seconds", 15), ("max_tier", 2), ("force", False), ("titles", None),
                  ("limit", None), ("library", "XBLA"), ("t_extract", 600),
-                 ("t_codegen", 600), ("t_build", 3600), ("max_codegen_iters", 8)]:
+                 ("t_codegen", 600), ("t_build", 3600), ("max_codegen_iters", 8),
+                 ("max_hints", 250), ("diverge_round", 100)]:
         if not hasattr(args, f):
             setattr(args, f, d)
     cfg = build_cfg(args)
